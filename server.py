@@ -47,6 +47,18 @@ def get_net_count():
         "timestamp": int(time.time())
     })
 
+@app.route("/update_count", methods=["POST"])
+def update_count():
+    data = request.json
+    cam_id = data["camera_id"]
+    net = data["net_count"]
+
+    with lock:
+        camera_net_counts[cam_id] = net
+
+    return jsonify({"message": "Count updated"})
+
+
 
 if __name__ == "__main__":
     print("🚀 Central Server Running...")
