@@ -2,6 +2,10 @@
 import cv2
 import time
 from ultralytics import YOLO
+from model_loader import load_model
+
+model = load_model()
+
 
 class CameraWorker:
     def __init__(self, camera_id, video_path, shared_dict, lock):
