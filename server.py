@@ -1,20 +1,18 @@
-
-
 from flask import Flask, request, jsonify
-from multiprocessing import Process, Manager, Lock
+from threading import Thread, Lock
 import time
+
 from camera_worker import CameraWorker
-from model_loader import load_model
-
-model = load_model()
-
 
 app = Flask(__name__)
 
-manager = Manager()
-camera_net_counts = manager.dict()
+# Shared net counts from each camera
+camera_net_counts = {}
 lock = Lock()
-camera_processes = {}
+
+# Camera thread storage
+camera_threads = {}
+
 
 @app.route("/add_camera", methods=["POST"])
 def add_camera():
@@ -22,16 +20,20 @@ def add_camera():
     camera_id = data["camera_id"]
     video_path = data["video_path"]
 
-    if camera_id in camera_processes:
+    if camera_id in camera_threads:
         return jsonify({"message": "Camera already exists"}), 400
 
+    # Start camera worker thread
     worker = CameraWorker(camera_id, video_path, camera_net_counts, lock)
-    process = Process(target=worker.run)
-    process.start()
 
-    camera_processes[camera_id] = process
+    thread = Thread(target=worker.run, daemon=True)
+    thread.start()
 
-    return jsonify({"message": f"Camera {camera_id} added and processing started"})
+    camera_threads[camera_id] = thread
+
+    return jsonify({
+        "message": f"Camera {camera_id} started successfully"
+    })
 
 
 @app.route("/net_count", methods=["GET"])
@@ -41,10 +43,11 @@ def get_net_count():
 
     return jsonify({
         "total_people_inside": total_inside,
-        "per_camera": dict(camera_net_counts),
+        "per_camera": camera_net_counts,
         "timestamp": int(time.time())
     })
 
 
 if __name__ == "__main__":
+    print("🚀 Central Server Running...")
     app.run(host="0.0.0.0", port=5000, debug=True)
