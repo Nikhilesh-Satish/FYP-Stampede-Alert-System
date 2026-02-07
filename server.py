@@ -4,6 +4,10 @@ from flask import Flask, request, jsonify
 from multiprocessing import Process, Manager, Lock
 import time
 from camera_worker import CameraWorker
+from model_loader import load_model
+
+model = load_model()
+
 
 app = Flask(__name__)
 
