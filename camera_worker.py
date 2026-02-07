@@ -10,13 +10,13 @@ class CameraWorker:
         self.shared_dict = shared_dict
         self.lock = lock
 
-        # ✅ Load your trained model
+        # Load trained YOLO model
         self.model = load_model()
 
-        # Line position
+        # Vertical counting line
         self.LINE_X = 320
 
-        # Interval counters (reset every 10 sec)
+        # Interval counters
         self.interval_in = 0
         self.interval_out = 0
 
@@ -24,7 +24,7 @@ class CameraWorker:
         self.last_x = {}
         self.counted_ids = set()
 
-        # Timer for reset
+        # Timer reset
         self.last_reset_time = time.time()
 
     def run(self):
@@ -37,48 +37,53 @@ class CameraWorker:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
 
-            # YOLO Tracking
             results = self.model.track(
                 frame,
                 persist=True,
                 tracker="botsort.yaml",
-                classes=[0]  # person class
+                classes=[0]
             )
 
-            if results[0].boxes.id is not None:
-                boxes = results[0].boxes.xyxy.cpu().numpy()
-                ids = results[0].boxes.id.cpu().numpy().astype(int)
+            # ✅ Safe detection check
+            if results[0].boxes is None or results[0].boxes.id is None:
+                continue
 
-                for box, track_id in zip(boxes, ids):
-                    x1, y1, x2, y2 = map(int, box)
-                    cx = (x1 + x2) // 2
+            boxes = results[0].boxes.xyxy.cpu().numpy()
+            ids = results[0].boxes.id.cpu().numpy().astype(int)
 
-                    if track_id in self.last_x:
-                        prev_x = self.last_x[track_id]
+            for box, track_id in zip(boxes, ids):
+                x1, y1, x2, y2 = map(int, box)
 
-                        if track_id not in self.counted_ids:
+                cx = (x1 + x2) // 2
+                cy = (y1 + y2) // 2
 
-                            # Crossing Left → Right
-                            if prev_x < self.LINE_X and cx >= self.LINE_X:
-                                self.interval_in += 1
-                                self.counted_ids.add(track_id)
+                # Optional ROI filter for accuracy
+                if cy < 100 or cy > 400:
+                    continue
 
-                            # Crossing Right → Left
-                            elif prev_x > self.LINE_X and cx <= self.LINE_X:
-                                self.interval_out += 1
-                                self.counted_ids.add(track_id)
+                if track_id in self.last_x:
+                    prev_x = self.last_x[track_id]
 
-                    self.last_x[track_id] = cx
+                    if track_id not in self.counted_ids:
 
-            # Every 10 seconds → send net count and reset
+                        if prev_x < self.LINE_X and cx >= self.LINE_X:
+                            self.interval_in += 1
+                            self.counted_ids.add(track_id)
+
+                        elif prev_x > self.LINE_X and cx <= self.LINE_X:
+                            self.interval_out += 1
+                            self.counted_ids.add(track_id)
+
+                self.last_x[track_id] = cx
+
+            # Send every 10 seconds
             if time.time() - self.last_reset_time >= 10:
-
                 net_count = self.interval_in - self.interval_out
 
                 with self.lock:
                     self.shared_dict[self.camera_id] = net_count
 
-                # Reset interval counts
+                # Reset interval state
                 self.interval_in = 0
                 self.interval_out = 0
                 self.counted_ids.clear()
