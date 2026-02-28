@@ -10,85 +10,98 @@ class CameraWorker:
         self.shared_dict = shared_dict
         self.lock = lock
 
-        # Load trained YOLO model
+        # ✅ Load your trained YOLO model
         self.model = load_model()
 
-        # Vertical counting line
-        self.LINE_X = 320
+        # ✅ Horizontal counting line (middle of frame)
+        self.LINE_Y = 240
 
-        # Interval counters
+        # ✅ Interval counters (reset every 10 seconds)
         self.interval_in = 0
         self.interval_out = 0
 
-        # Tracking memory
-        self.last_x = {}
+        # ✅ Tracking memory
+        self.last_y = {}
         self.counted_ids = set()
 
-        # Timer reset
+        # ✅ Timer for 10-sec reset
         self.last_reset_time = time.time()
 
     def run(self):
         cap = cv2.VideoCapture(self.video_path)
 
+        print(f"🎥 Camera {self.camera_id} started processing...")
+
         while True:
             ret, frame = cap.read()
 
+            # Restart video if ended
             if not ret:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
 
+            # ✅ Apply YOLO Tracking
             results = self.model.track(
                 frame,
                 persist=True,
                 tracker="botsort.yaml",
-                classes=[0]
+                classes=[0]  # person class only
             )
 
-            # ✅ Safe detection check
-            if results[0].boxes is None or results[0].boxes.id is None:
-                continue
+            # ✅ If detections exist
+            if results[0].boxes is not None and results[0].boxes.id is not None:
 
-            boxes = results[0].boxes.xyxy.cpu().numpy()
-            ids = results[0].boxes.id.cpu().numpy().astype(int)
+                boxes = results[0].boxes.xyxy.cpu().numpy()
+                ids = results[0].boxes.id.cpu().numpy().astype(int)
 
-            for box, track_id in zip(boxes, ids):
-                x1, y1, x2, y2 = map(int, box)
+                for box, track_id in zip(boxes, ids):
+                    x1, y1, x2, y2 = map(int, box)
 
-                cx = (x1 + x2) // 2
-                cy = (y1 + y2) // 2
+                    # ✅ Compute centroid Y
+                    cy = (y1 + y2) // 2
 
-                # Optional ROI filter for accuracy
-                if cy < 100 or cy > 400:
-                    continue
+                    # If we saw this ID before
+                    if track_id in self.last_y:
+                        prev_y = self.last_y[track_id]
 
-                if track_id in self.last_x:
-                    prev_x = self.last_x[track_id]
+                        # Count only once per ID per interval
+                        if track_id not in self.counted_ids:
 
-                    if track_id not in self.counted_ids:
+                            # ✅ DOWNWARD crossing → IN
+                            if prev_y < self.LINE_Y and cy >= self.LINE_Y:
+                                self.interval_in += 1
+                                self.counted_ids.add(track_id)
+                                print(f"{self.camera_id}: ID {track_id} -> IN")
 
-                        if prev_x < self.LINE_X and cx >= self.LINE_X:
-                            self.interval_in += 1
-                            self.counted_ids.add(track_id)
+                            # ✅ UPWARD crossing → OUT
+                            elif prev_y > self.LINE_Y and cy <= self.LINE_Y:
+                                self.interval_out += 1
+                                self.counted_ids.add(track_id)
+                                print(f"{self.camera_id}: ID {track_id} -> OUT")
 
-                        elif prev_x > self.LINE_X and cx <= self.LINE_X:
-                            self.interval_out += 1
-                            self.counted_ids.add(track_id)
+                    # Update last position
+                    self.last_y[track_id] = cy
 
-                self.last_x[track_id] = cx
-
-            # Send every 10 seconds
+            # ✅ Every 10 seconds → send net count to server
             if time.time() - self.last_reset_time >= 10:
+
                 net_count = self.interval_in - self.interval_out
 
+                # Update shared dictionary safely
                 with self.lock:
                     self.shared_dict[self.camera_id] = net_count
 
-                # Reset interval state
+                print(f"\n📡 {self.camera_id} REPORT (10 sec)")
+                print(f"IN: {self.interval_in}, OUT: {self.interval_out}")
+                print(f"NET COUNT SENT: {net_count}\n")
+
+                # ✅ Reset for next interval
                 self.interval_in = 0
                 self.interval_out = 0
                 self.counted_ids.clear()
-                self.last_x.clear()
+                self.last_y.clear()
 
                 self.last_reset_time = time.time()
 
+            # Small delay for real-time simulation (~30 FPS)
             time.sleep(0.03)
