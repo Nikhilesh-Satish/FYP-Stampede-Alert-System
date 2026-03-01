@@ -1,0 +1,15 @@
+.about {
+  width: 70%;
+  margin: 0 auto;
+}
+
+
+
+.title {
+  text-align: center;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #00e5cc;
+  margin-bottom: 1.5rem;
+}

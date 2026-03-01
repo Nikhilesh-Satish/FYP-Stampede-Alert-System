@@ -1,0 +1,33 @@
+.aboutCard {
+  width: 70%;
+  height: auto;
+  margin: 0 auto;
+  background-color: #071934;
+  margin-bottom: 2rem;
+}
+
+.aboutName {
+  text-align: center;
+}
+
+.aboutPhoto {
+  display: block;
+  margin: 0 auto;
+  border-radius: 50%;
+  height: 10%;
+  width: 10%;
+}
+
+.aboutDesc {
+  text-align: center;
+  font-size: 1.1rem;
+  color: #dfe5ec;
+}
+
+.linkedinIcon {
+  display: block;
+  margin: 0 auto;
+  width: 2.5%;
+  height: auto;
+  padding-bottom: 1rem;
+}
