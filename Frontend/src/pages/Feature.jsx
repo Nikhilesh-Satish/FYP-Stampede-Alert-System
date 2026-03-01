@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import styles from "./Features.module.css";
-const Features = () => {
+import styles from "./Feature.module.css";
+const Feature = () => {
   return (
     <div>
       <Navbar />
@@ -116,4 +116,4 @@ const Features = () => {
   );
 };
 
-export default Features;
+export default Feature;

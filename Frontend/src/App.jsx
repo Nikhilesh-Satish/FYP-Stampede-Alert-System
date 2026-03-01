@@ -6,7 +6,7 @@ import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import "./App.css";
 import About from "./pages/About";
-import Features from "./pages/Features";
+import Feature from "./pages/Feature";
 
 function App() {
   return (
@@ -24,7 +24,7 @@ function App() {
             }
           />
           <Route path="/about" element={<About />} />
-          <Route path="/features" element={<Features />} />
+          <Route path="/features" element={<Feature />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
