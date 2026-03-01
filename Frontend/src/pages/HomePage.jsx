@@ -1,6 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import styles from "./HomePage.module.css";
+import StatCard from "./StatCard";
+import statStyles from "./StatCard.module.css";
+import Demo from "./Demo";
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -75,11 +78,38 @@ const HomePage = () => {
       </section>
 
       {/* Feature cards */}
-      
 
-      <footer className={styles.footer}>
-        <p className={styles.copyright}>Copyright © JSS STU 2025</p>
-      </footer>
+      <h2 className={statStyles.statHeading}>
+        <center>
+          Why are stampedes a big threat? The statistics hold the answers
+        </center>
+      </h2>
+
+      <StatCard
+        img="./src/assets/chart1(2).png"
+        desc="Stampede-related deaths are not limited to isolated regions — both India and the global community have experienced thousands of fatalities, showing that crowd disasters are a widespread and persistent public safety threat."
+      />
+      <StatCard
+        img="./src/assets/chart2(2).png"
+        desc="Stampedes occur regularly rather than rarely, resulting in continuous monthly loss of life and reinforcing the need for proactive crowd monitoring systems."
+      />
+
+      <StatCard
+        img="./src/assets/chart4(1).png"
+        desc="Physical constraints and behavioral triggers — such as narrow exits, panic, and unmanaged crowd flow — repeatedly emerge as key contributors to crowd disasters worldwide."
+      />
+      <StatCard
+        img="./src/assets/chart6.png"
+        desc="As crowd density increases, individual movement becomes restricted and pressure builds rapidly, dramatically raising the likelihood of a crush situation."
+      />
+      <div className={styles.homeForm}>
+        <Demo />
+      </div>
+      <center>
+        <footer className={styles.footer}>
+          <p className={styles.copyright}>Copyright © JSS STU 2025</p>
+        </footer>
+      </center>
     </div>
   );
 };

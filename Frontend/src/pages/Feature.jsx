@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import styles from "./Feature.module.css";
+import Demo from "./Demo";
 const Feature = () => {
   return (
     <div>
@@ -112,6 +113,7 @@ const Feature = () => {
           </div>
         ))}
       </section>
+      <Demo />
     </div>
   );
 };

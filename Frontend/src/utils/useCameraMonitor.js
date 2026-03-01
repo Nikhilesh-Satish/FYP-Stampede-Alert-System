@@ -1,68 +1,97 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { cameraApi } from '../api/services'
-import { getAlertLevel } from '../api/config'
+import { useState, useEffect, useCallback, useRef } from "react";
+import { cameraApi } from "../api/services";
+import { getAlertLevel, DEFAULT_AREA_CAPACITY } from "../api/config";
 
-// Polls camera counts from your API every 10 minutes
-const POLL_INTERVAL_MS = 10 * 60 * 1000
+// Polls camera counts from your API every 10 seconds (synced with camera worker)
+const POLL_INTERVAL_MS = 10 * 1000;
 
-export const useCameraMonitor = (cameras) => {
-  const [counts,      setCounts]      = useState({})  // { cameraId: { count, timestamp, alertLevel } }
-  const [alerts,      setAlerts]      = useState([])  // active non-safe alerts
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const intervalRef = useRef(null)
+export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
+  const [counts, setCounts] = useState({}); // { cameraId: { count, timestamp } }
+  const [globalAlert, setGlobalAlert] = useState(null); // { totalCount, occupancyPercent, alertLevel }
+  const [alerts, setAlerts] = useState([]); // active non-safe alerts
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const intervalRef = useRef(null);
 
   const fetchCounts = useCallback(async () => {
-    if (!cameras || cameras.length === 0) return
+    if (!cameras || cameras.length === 0) return;
 
     try {
-      let countData = []
+      let countData = [];
 
       // Try bulk endpoint first, fall back to individual calls
       try {
-        countData = await cameraApi.getAllCameraCounts()
-      } catch {
+        countData = await cameraApi.getAllCameraCounts();
+        console.log("✅ Fetched all camera counts:", countData);
+      } catch (err) {
+        console.log("Bulk fetch failed, trying individual:", err);
         const results = await Promise.all(
           cameras.map((cam) =>
-            cameraApi.getCameraCount(cam.id)
-              .catch(() => ({ camera_id: cam.id, count: null, timestamp: null }))
-          )
-        )
-        countData = results
+            cameraApi
+              .getCameraCount(cam.id)
+              .then((data) => {
+                console.log(`✅ Got count for ${cam.id}:`, data);
+                return data;
+              })
+              .catch((e) => {
+                console.log(`❌ Failed to get count for ${cam.id}:`, e);
+                return { camera_id: cam.id, count: null, timestamp: null };
+              }),
+          ),
+        );
+        countData = results;
       }
 
-      const newCounts = {}
-      const newAlerts = []
+      const newCounts = {};
+      let totalCount = 0;
+      const newAlerts = [];
 
+      // Collect individual counts
       countData.forEach(({ camera_id, count, timestamp }) => {
-        if (count === null || count === undefined) return
-        const alertLevel = getAlertLevel(count)
-        newCounts[camera_id] = { count, timestamp, alertLevel }
+        if (count === null || count === undefined) return;
+        newCounts[camera_id] = { count, timestamp };
+        totalCount += count;
+      });
 
-        if (alertLevel.level !== 'SAFE') {
-          const cam = cameras.find((c) => c.id === camera_id)
-          newAlerts.push({
-            cameraId:   camera_id,
-            cameraName: cam?.name || camera_id,
-            count,
-            alertLevel,
-            timestamp:  timestamp || new Date().toISOString(),
-          })
-        }
-      })
+      // Calculate global alert based on total occupancy
+      const globalAlertLevel = getAlertLevel(totalCount, capacity);
+      const occupancyPercent = Math.round((totalCount / capacity) * 100);
 
-      setCounts(newCounts)
-      setAlerts(newAlerts)
-      setLastUpdated(new Date())
+      setGlobalAlert({
+        totalCount,
+        occupancyPercent,
+        alertLevel: globalAlertLevel,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Add alert if global level is not SAFE
+      if (globalAlertLevel.level !== "SAFE") {
+        newAlerts.push({
+          type: "AREA_WIDE",
+          message: `Area occupancy at ${occupancyPercent}% (${totalCount}/${capacity} people)`,
+          alertLevel: globalAlertLevel,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      setCounts(newCounts);
+      setAlerts(newAlerts);
+      setLastUpdated(new Date());
     } catch (err) {
-      console.error('Failed to fetch camera counts:', err)
+      console.error("Failed to fetch camera counts:", err);
     }
-  }, [cameras])
+  }, [cameras, capacity]);
 
   useEffect(() => {
-    fetchCounts()
-    intervalRef.current = setInterval(fetchCounts, POLL_INTERVAL_MS)
-    return () => clearInterval(intervalRef.current)
-  }, [fetchCounts])
+    fetchCounts();
+    intervalRef.current = setInterval(fetchCounts, POLL_INTERVAL_MS);
+    return () => clearInterval(intervalRef.current);
+  }, [fetchCounts]);
 
-  return { counts, alerts, lastUpdated, forceRefresh: fetchCounts }
-}
+  return {
+    counts,
+    globalAlert,
+    alerts,
+    lastUpdated,
+    forceRefresh: fetchCounts,
+  };
+};

@@ -1,0 +1,37 @@
+.statCard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #1a2535;
+  margin-left: 3rem;
+  margin-right: 3rem;
+  padding-top: 1rem;
+}
+
+.statImg {
+  height: 90%;
+  margin-left: 1rem;
+  margin-top: 1rem;
+  width: auto;
+}
+
+.statDesc {
+  font-size: 1.4rem;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-top: 6rem;
+  margin-right: 1rem;
+}
+
+.statHeading {
+  font-size: 1.75rem;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  color: #00e5cc;
+  background: #1a2535;
+  margin-bottom: 0;
+  margin-top: 2rem;
+  margin-left: 3rem;
+  margin-right: 3rem;
+  padding-top: 2rem;
+}
