@@ -16,7 +16,10 @@ class CameraWorker:
         # ✅ Horizontal counting line (middle of frame)
         self.LINE_Y = 240
 
-        # ✅ Interval counters (reset every 10 seconds)
+        # ✅ Cumulative count of people inside (never goes below 0)
+        self.people_inside = 0
+
+        # ✅ Interval counters (reset every 10 seconds for reporting)
         self.interval_in = 0
         self.interval_out = 0
 
@@ -29,6 +32,11 @@ class CameraWorker:
 
     def run(self):
         cap = cv2.VideoCapture(self.video_path)
+
+        # Check if video opened successfully
+        if not cap.isOpened():
+            print(f"❌ Camera {self.camera_id}: Failed to open video stream at '{self.video_path}'")
+            return
 
         print(f"🎥 Camera {self.camera_id} started processing...")
 
@@ -70,14 +78,16 @@ class CameraWorker:
                             # ✅ DOWNWARD crossing → IN
                             if prev_y < self.LINE_Y and cy >= self.LINE_Y:
                                 self.interval_in += 1
+                                self.people_inside += 1
                                 self.counted_ids.add(track_id)
-                                print(f"{self.camera_id}: ID {track_id} -> IN")
+                                print(f"{self.camera_id}: ID {track_id} -> IN (total: {self.people_inside})")
 
                             # ✅ UPWARD crossing → OUT
                             elif prev_y > self.LINE_Y and cy <= self.LINE_Y:
                                 self.interval_out += 1
+                                self.people_inside = max(0, self.people_inside - 1)  # Never go below 0
                                 self.counted_ids.add(track_id)
-                                print(f"{self.camera_id}: ID {track_id} -> OUT")
+                                print(f"{self.camera_id}: ID {track_id} -> OUT (total: {self.people_inside})")
 
                     # Update last position
                     self.last_y[track_id] = cy
@@ -85,17 +95,15 @@ class CameraWorker:
             # ✅ Every 10 seconds → send net count to server
             if time.time() - self.last_reset_time >= 10:
 
-                net_count = self.interval_in - self.interval_out
-
-                # Update shared dictionary safely
+                # Update shared dictionary safely with cumulative count
                 with self.lock:
-                    self.shared_dict[self.camera_id] = net_count
+                    self.shared_dict[self.camera_id] = self.people_inside
 
                 print(f"\n📡 {self.camera_id} REPORT (10 sec)")
                 print(f"IN: {self.interval_in}, OUT: {self.interval_out}")
-                print(f"NET COUNT SENT: {net_count}\n")
+                print(f"PEOPLE INSIDE: {self.people_inside}\n")
 
-                # ✅ Reset for next interval
+                # ✅ Reset interval counters for next period
                 self.interval_in = 0
                 self.interval_out = 0
                 self.counted_ids.clear()
