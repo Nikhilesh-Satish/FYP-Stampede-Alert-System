@@ -16,7 +16,7 @@ const About = () => {
         <AboutCard
           photo={"./src/assets/1.jpg"}
           name="Praagna L Vaishnavi"
-          description="Praagna is an Intern at GoTo. She leads the team and is responsible for the overall project management, coordination, and communication. With her strong leadership skills and dedication, Praagna ensures that the team stays on track and achieves its goals effectively. Responsible for evaluating various models. "
+          description="Praagna is an Intern at GoTo. She leads the team and is responsible for the overall project management, coordination, and communication. With her strong leadership skills and dedication, Praagna ensures that the team stays on track and achieves its goals effectively. Responsible for evaluating various models, backend and frontend development. "
           socials="https://www.linkedin.com/in/praagna-vaishnavi/"
         />
         <AboutCard
