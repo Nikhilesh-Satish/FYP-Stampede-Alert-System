@@ -7,7 +7,7 @@ Follow these steps to set up and run the project locally.
 ## 📥 Step 1: Clone the Repository
 
 ```bash
-git clone <your-repo-url>
+git clone "https://github.com/Nikhilesh-Satish/FYP-Stampede-Alert-System.git"
 cd FYP-Stampede-Alert-System
 ```
 
