@@ -10,6 +10,8 @@ export const ENDPOINTS = {
   CAMERAS: "/cameras",
   ADD_CAMERA: "/cameras/add",
   CAMERA_COUNTS: "/cameras/counts", // GET /cameras/counts  or  /cameras/counts/:id
+  RESET_COUNT: "/cameras/reset", // POST /cameras/reset/:id
+  RESET_ALL_COUNTS: "/cameras/reset-all", // POST /cameras/reset-all
 };
 
 // ─── GLOBAL CAPACITY SETTING ──────────────────────────────────────────────────

@@ -31,6 +31,7 @@ const DashboardPage = () => {
   const [fetchError, setFetchError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [capacity, setCapacity] = useState(DEFAULT_AREA_CAPACITY);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const { counts, globalAlert, alerts, lastUpdated, forceRefresh } =
     useCameraMonitor(cameras, capacity);
@@ -63,6 +64,21 @@ const DashboardPage = () => {
       setCameras((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
       alert("Delete failed: " + err.message);
+    }
+  };
+
+  const handleResetGlobalCount = async () => {
+    if (!window.confirm("Reset total count to 0 for all cameras?")) return;
+
+    setResetLoading(true);
+    try {
+      await cameraApi.resetAllCameraCounts();
+      forceRefresh();
+      alert("Global count reset successfully!");
+    } catch (err) {
+      alert("Failed to reset count: " + err.message);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -175,26 +191,83 @@ const DashboardPage = () => {
 
         {/* Stats */}
         <div className={styles.statsRow}>
-          <StatCard
-            label="Total People"
-            value={`${totalPeople}/${capacity}`}
-            color={alertLevel?.color || "#00e5cc"}
-            icon={
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <circle cx="9" cy="7" r="3" />
-                <path d="M3 21v-2a6 6 0 0 1 6-6" />
-                <circle cx="17" cy="7" r="3" />
-                <path d="M21 21v-2a6 6 0 0 0-6-6" />
-              </svg>
-            }
-          />
+          <div style={{ position: "relative" }}>
+            <StatCard
+              label="Total People"
+              value={`${totalPeople}/${capacity}`}
+              color={alertLevel?.color || "#00e5cc"}
+              icon={
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <circle cx="9" cy="7" r="3" />
+                  <path d="M3 21v-2a6 6 0 0 1 6-6" />
+                  <circle cx="17" cy="7" r="3" />
+                  <path d="M21 21v-2a6 6 0 0 0-6-6" />
+                </svg>
+              }
+            />
+            <button
+              onClick={handleResetGlobalCount}
+              disabled={resetLoading}
+              title="Reset global count to 0"
+              style={{
+                position: "absolute",
+                top: "8px",
+                right: "8px",
+                background: "rgba(100, 116, 139, 0.2)",
+                border: "1px solid rgba(100, 116, 139, 0.4)",
+                color: "#94a3b8",
+                cursor: resetLoading ? "not-allowed" : "pointer",
+                padding: "6px 10px",
+                borderRadius: "5px",
+                fontSize: "11px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                transition: "all 0.2s",
+                opacity: resetLoading ? 0.6 : 1,
+              }}
+              onMouseOver={(e) => {
+                if (!resetLoading) {
+                  e.target.style.background = "rgba(0, 229, 204, 0.1)";
+                  e.target.style.color = "#00e5cc";
+                  e.target.style.borderColor = "rgba(0, 229, 204, 0.4)";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!resetLoading) {
+                  e.target.style.background = "rgba(100, 116, 139, 0.2)";
+                  e.target.style.color = "#94a3b8";
+                  e.target.style.borderColor = "rgba(100, 116, 139, 0.4)";
+                }
+              }}
+            >
+              {resetLoading ? (
+                <>
+                  <div
+                    style={{
+                      width: "10px",
+                      height: "10px",
+                      border: "2px solid rgba(255, 255, 255, 0.08)",
+                      borderTopColor: "#00e5cc",
+                      borderRadius: "50%",
+                      animation: "spin 1s linear infinite",
+                    }}
+                  />
+                  <span>Resetting...</span>
+                </>
+              ) : (
+                "Reset"
+              )}
+            </button>
+          </div>
           <div className={styles.statCard}>
             <div
               className={styles.statIcon}

@@ -129,4 +129,31 @@ export const cameraApi = {
     });
     return handleResponse(res);
   },
+
+  /**
+   * POST /cameras/reset/:cameraId
+   * Resets the count for a specific camera to 0
+   */
+  resetCameraCount: async (cameraId) => {
+    const res = await fetch(
+      `${API_BASE_URL}${ENDPOINTS.RESET_COUNT}/${cameraId}`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /cameras/reset-all
+   * Resets the count for all cameras to 0
+   */
+  resetAllCameraCounts: async () => {
+    const res = await fetch(`${API_BASE_URL}${ENDPOINTS.RESET_ALL_COUNTS}`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(res);
+  },
 };

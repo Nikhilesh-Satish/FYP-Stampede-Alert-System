@@ -1,6 +1,9 @@
+import { useState } from "react";
+import { cameraApi } from "../api/services";
 import styles from "./CameraCard.module.css";
 
 const CameraCard = ({ camera, countData, onDelete }) => {
+  const [resetLoading, setResetLoading] = useState(false);
   const count = countData?.count ?? null;
   const alertLevel = countData?.alertLevel;
   const timestamp = countData?.timestamp;
@@ -11,6 +14,20 @@ const CameraCard = ({ camera, countData, onDelete }) => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const handleResetCount = async () => {
+    if (!window.confirm("Reset count to 0 for this camera?")) return;
+
+    setResetLoading(true);
+    try {
+      await cameraApi.resetCameraCount(camera.id);
+      alert("Count reset successfully!");
+    } catch (err) {
+      alert("Failed to reset count: " + err.message);
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -80,24 +97,51 @@ const CameraCard = ({ camera, countData, onDelete }) => {
               </span>
               <span className={styles.countUnit}>people detected</span>
             </div>
-            {alertLevel && (
-              <div
-                className={styles.badge}
-                style={{
-                  background: alertLevel.bg,
-                  color: alertLevel.color,
-                  borderColor: `${alertLevel.color}44`,
-                }}
+            <div className={styles.countControls}>
+              {alertLevel && (
+                <div
+                  className={styles.badge}
+                  style={{
+                    background: alertLevel.bg,
+                    color: alertLevel.color,
+                    borderColor: `${alertLevel.color}44`,
+                  }}
+                >
+                  {alertLevel.level === "CRITICAL" && (
+                    <span
+                      className={styles.blinkDot}
+                      style={{ background: alertLevel.color }}
+                    />
+                  )}
+                  {alertLevel.label}
+                </div>
+              )}
+              <button
+                className={styles.resetBtn}
+                onClick={handleResetCount}
+                disabled={resetLoading}
+                title="Reset count to 0"
               >
-                {alertLevel.level === "CRITICAL" && (
-                  <span
-                    className={styles.blinkDot}
-                    style={{ background: alertLevel.color }}
-                  />
+                {resetLoading ? (
+                  <span className={styles.resetSpinner} />
+                ) : (
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6" />
+                    <path d="M2 11.5a10 10 0 0 1 18.8-4.3" />
+                    <path d="M22 12.5a10 10 0 0 1-18.8 4.2" />
+                  </svg>
                 )}
-                {alertLevel.label}
-              </div>
-            )}
+              </button>
+            </div>
           </>
         ) : (
           <div className={styles.pending}>

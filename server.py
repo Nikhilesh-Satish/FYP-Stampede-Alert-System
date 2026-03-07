@@ -124,6 +124,36 @@ def get_camera_count(camera_id):
     })
 
 
+@app.route("/cameras/reset/<camera_id>", methods=["POST"])
+def reset_camera_count(camera_id):
+    """Reset the count for a specific camera to 0"""
+    if camera_id not in camera_threads:
+        return jsonify({"message": "Camera not found"}), 404
+    
+    with lock:
+        camera_net_counts[camera_id] = 0
+    
+    return jsonify({
+        "message": f"Count reset for camera {camera_id}",
+        "camera_id": camera_id,
+        "count": 0,
+        "timestamp": int(time.time())
+    })
+
+
+@app.route("/cameras/reset-all", methods=["POST"])
+def reset_all_camera_counts():
+    """Reset the count for all cameras to 0"""
+    with lock:
+        for cam_id in camera_net_counts:
+            camera_net_counts[cam_id] = 0
+    
+    return jsonify({
+        "message": "All camera counts reset to 0",
+        "timestamp": int(time.time())
+    })
+
+
 @app.route("/net_count", methods=["GET"])
 def get_net_count():
     with lock:

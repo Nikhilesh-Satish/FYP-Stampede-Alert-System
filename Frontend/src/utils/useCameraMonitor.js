@@ -81,10 +81,42 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
     }
   }, [cameras, capacity]);
 
+  // Function to restart the interval
+  const restartInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = setInterval(() => {
+      fetchCounts();
+    }, POLL_INTERVAL_MS);
+  }, []);
+
+  // Manual refresh: fetch immediately and restart interval
+  const forceRefresh = useCallback(async () => {
+    await fetchCounts();
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = setInterval(() => {
+      fetchCounts();
+    }, POLL_INTERVAL_MS);
+  }, [fetchCounts]);
+
   useEffect(() => {
+    // Initial fetch and start interval
     fetchCounts();
-    intervalRef.current = setInterval(fetchCounts, POLL_INTERVAL_MS);
-    return () => clearInterval(intervalRef.current);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = setInterval(() => {
+      fetchCounts();
+    }, POLL_INTERVAL_MS);
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [fetchCounts]);
 
   return {
@@ -92,6 +124,6 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
     globalAlert,
     alerts,
     lastUpdated,
-    forceRefresh: fetchCounts,
+    forceRefresh,
   };
 };
