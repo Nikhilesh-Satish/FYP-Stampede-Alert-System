@@ -1,37 +1,121 @@
 import { useMemo } from "react";
 import styles from "./PredictionCard.module.css";
 
+const DEFAULT_SAMPLE_INTERVAL_MS = 10 * 1000;
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+const FIFTY_MINUTES_MS = 50 * 60 * 1000;
+const MIN_FORECAST_POINTS = 6;
+const MIN_HISTORY_SPAN_MS = 60 * 1000;
+
+const median = (arr) => {
+  if (!arr.length) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+};
+
 const PredictionCard = ({ data = [], capacity }) => {
   const prediction = useMemo(() => {
     if (data.length < 2) {
       return null;
     }
 
-    const recentData = data.slice(-10);
+    const recentData = data.slice(-20);
     const values = recentData.map((d) => d.count);
+    const timestamps = recentData.map((d) => d.timestamp);
 
-    // Calculate trend
-    const firstHalf = values.slice(0, Math.floor(values.length / 2));
-    const secondHalf = values.slice(Math.floor(values.length / 2));
+    // Estimate sample interval from actual timestamps for true time-based forecasting.
+    const intervals = [];
+    for (let i = 1; i < timestamps.length; i += 1) {
+      const prev = timestamps[i - 1];
+      const curr = timestamps[i];
+      if (Number.isFinite(prev) && Number.isFinite(curr) && curr > prev) {
+        intervals.push(curr - prev);
+      }
+    }
+    const avgIntervalMs =
+      intervals.length > 0
+        ? intervals.reduce((a, b) => a + b, 0) / intervals.length
+        : DEFAULT_SAMPLE_INTERVAL_MS;
 
-    const avgFirst =
-      firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length || 0;
-    const avgSecond =
-      secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length || 0;
+    const lastValue = values[values.length - 1];
+    const historySpanMs = Math.max(0, timestamps[timestamps.length - 1] - timestamps[0]);
 
-    const trend = avgSecond - avgFirst;
-    const trendPercent = ((trend / (avgFirst + 1)) * 100).toFixed(1);
+    // Stabilize early forecasting: until enough history is collected, keep estimate near current value.
+    if (values.length < MIN_FORECAST_POINTS || historySpanMs < MIN_HISTORY_SPAN_MS) {
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance =
+        values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length;
+      const stdDev = Math.sqrt(variance);
+      return {
+        trend: "0.00",
+        trendPercent: "0.0",
+        volatility: stdDev.toFixed(1),
+        predictedNext: Math.max(0, Math.round(lastValue)),
+        predictedNext5: Math.max(0, Math.round(lastValue)),
+        riskLevel: lastValue > capacity ? "Critical" : "Low",
+        riskColor: lastValue > capacity ? "#dc2626" : "#10b981",
+        riskMessage:
+          lastValue > capacity
+            ? `⚠️ CAPACITY EXCEEDED: Currently over safe limit by ${Math.round(lastValue - capacity)} people`
+            : "Collecting more history for stable forecasting",
+        avgCurrent: mean.toFixed(1),
+      };
+    }
+
+    // Robust slope (Theil-Sen): median of pairwise slopes in people/ms.
+    const pairwiseSlopes = [];
+    for (let i = 0; i < values.length - 1; i += 1) {
+      for (let j = i + 1; j < values.length; j += 1) {
+        const dt = timestamps[j] - timestamps[i];
+        if (dt > 0) {
+          pairwiseSlopes.push((values[j] - values[i]) / dt);
+        }
+      }
+    }
+    const slopePerMs = median(pairwiseSlopes);
+
+    // Also compute recent absolute rate to clamp impossible forecast jumps from transient glitches.
+    const absRates = [];
+    for (let i = 1; i < values.length; i += 1) {
+      const dt = timestamps[i] - timestamps[i - 1];
+      if (dt > 0) {
+        absRates.push(Math.abs((values[i] - values[i - 1]) / dt));
+      }
+    }
+    const medianAbsRatePerMs = median(absRates);
+
+    const maxDelta10 = Math.max(100, medianAbsRatePerMs * TEN_MINUTES_MS * 3);
+    const maxDelta50 = Math.max(200, medianAbsRatePerMs * FIFTY_MINUTES_MS * 3);
+
+    const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
+    const predictedNextRaw = lastValue + slopePerMs * TEN_MINUTES_MS;
+    const predictedNext5Raw = lastValue + slopePerMs * FIFTY_MINUTES_MS;
+    const predictedNext = Math.max(
+      0,
+      Math.round(clamp(predictedNextRaw, lastValue - maxDelta10, lastValue + maxDelta10)),
+    );
+    const predictedNext5 = Math.max(
+      0,
+      Math.round(clamp(predictedNext5Raw, lastValue - maxDelta50, lastValue + maxDelta50)),
+    );
+
+    // Keep displayed trend in people per sample step for UI continuity.
+    const trendPerStep = slopePerMs * avgIntervalMs;
+
+    // Legacy stats used elsewhere in the card.
+    const n = values.length;
+    const yMean = values.reduce((a, b) => a + b, 0) / n;
+    const trendPercent = ((trendPerStep / (yMean + 1)) * 100).toFixed(1);
 
     // Calculate volatility (standard deviation)
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const mean = yMean;
     const variance =
       values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length;
     const stdDev = Math.sqrt(variance);
-
-    // Predict next value
-    const lastValue = values[values.length - 1];
-    const predictedNext = Math.max(0, Math.round(lastValue + trend));
-    const predictedNext5 = Math.max(0, Math.round(lastValue + trend * 5));
 
     // Determine risk level
     let riskLevel = "Low";
@@ -57,15 +141,16 @@ const PredictionCard = ({ data = [], capacity }) => {
       riskMessage = "Moderate rise in crowd levels detected";
     }
 
-    if (trend > mean * 0.1 && lastValue <= capacity) {
+    const projected10MinDelta = predictedNext - lastValue;
+    if (Math.abs(projected10MinDelta) > mean * 0.1 && lastValue <= capacity) {
       riskMessage =
-        trend > 0
+        projected10MinDelta > 0
           ? "⬆️ Crowd size is increasing"
           : "⬇️ Crowd size is decreasing";
     }
 
     return {
-      trend: trend.toFixed(1),
+      trend: trendPerStep.toFixed(2),
       trendPercent,
       volatility: stdDev.toFixed(1),
       predictedNext,
