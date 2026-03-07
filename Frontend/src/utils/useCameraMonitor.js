@@ -1,16 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cameraApi } from "../api/services";
 import { getAlertLevel, DEFAULT_AREA_CAPACITY } from "../api/config";
+import { useChartData } from "../hooks/useChartData";
 
 // Polls camera counts from your API every 10 seconds (synced with camera worker)
 const POLL_INTERVAL_MS = 10 * 1000;
 
-export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
+export const useCameraMonitor = (
+  cameras,
+  capacity = DEFAULT_AREA_CAPACITY,
+  isPaused = true,
+) => {
   const [counts, setCounts] = useState({}); // { cameraId: { count, timestamp } }
   const [globalAlert, setGlobalAlert] = useState(null); // { totalCount, occupancyPercent, alertLevel }
   const [alerts, setAlerts] = useState([]); // active non-safe alerts
   const [lastUpdated, setLastUpdated] = useState(null);
   const intervalRef = useRef(null);
+
+  // Use chart data hook for historical tracking
+  const {
+    globalHistory,
+    cameraHistory,
+    addGlobalDataPoint,
+    addCameraDataPoint,
+  } = useChartData();
 
   const fetchCounts = useCallback(async () => {
     if (!cameras || cameras.length === 0) return;
@@ -50,7 +63,17 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
         if (count === null || count === undefined) return;
         newCounts[camera_id] = { count, timestamp };
         totalCount += count;
+
+        // Add data point to camera history (only if not paused)
+        if (!isPaused) {
+          addCameraDataPoint(camera_id, count);
+        }
       });
+
+      // Add global data point (only if not paused)
+      if (!isPaused) {
+        addGlobalDataPoint(totalCount);
+      }
 
       // Calculate global alert based on total occupancy
       const globalAlertLevel = getAlertLevel(totalCount, capacity);
@@ -65,9 +88,20 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
 
       // Add alert if global level is not SAFE
       if (globalAlertLevel.level !== "SAFE") {
+        let alertMessage = "";
+
+        if (totalCount > capacity) {
+          const exceeded = totalCount - capacity;
+          alertMessage = `🚨 CAPACITY EXCEEDED: ${exceeded} people over safe limit (${totalCount}/${capacity})`;
+        } else if (occupancyPercent >= 80) {
+          alertMessage = `⚠️ Approaching safe capacity: ${totalCount}/${capacity} people (${occupancyPercent}%)`;
+        } else {
+          alertMessage = `Area occupancy at ${occupancyPercent}% (${totalCount}/${capacity} people)`;
+        }
+
         newAlerts.push({
           type: "AREA_WIDE",
-          message: `Area occupancy at ${occupancyPercent}% (${totalCount}/${capacity} people)`,
+          message: alertMessage,
           alertLevel: globalAlertLevel,
           timestamp: new Date().toISOString(),
         });
@@ -79,7 +113,7 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
     } catch (err) {
       console.error("Failed to fetch camera counts:", err);
     }
-  }, [cameras, capacity]);
+  }, [cameras, capacity, isPaused, addGlobalDataPoint, addCameraDataPoint]);
 
   // Function to restart the interval
   const restartInterval = useCallback(() => {
@@ -103,7 +137,15 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
   }, [fetchCounts]);
 
   useEffect(() => {
-    // Initial fetch and start interval
+    // If paused, don't fetch or set up interval
+    if (isPaused) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      return;
+    }
+
+    // Initial fetch and start interval when not paused
     fetchCounts();
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -111,13 +153,13 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
     intervalRef.current = setInterval(() => {
       fetchCounts();
     }, POLL_INTERVAL_MS);
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [fetchCounts]);
+  }, [fetchCounts, isPaused]);
 
   return {
     counts,
@@ -125,5 +167,7 @@ export const useCameraMonitor = (cameras, capacity = DEFAULT_AREA_CAPACITY) => {
     alerts,
     lastUpdated,
     forceRefresh,
+    globalHistory,
+    cameraHistory,
   };
 };

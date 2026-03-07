@@ -7,6 +7,9 @@ import Navbar from "../components/Navbar";
 import CameraCard from "../components/CameraCard";
 import AddCameraModal from "../components/AddCameraModal";
 import AlertBanner from "../components/AlertBanner";
+import GlobalTrendChart from "../components/GlobalTrendChart";
+import CameraTrendChart from "../components/CameraTrendChart";
+import PredictionCard from "../components/PredictionCard";
 import styles from "./DashboardPage.module.css";
 
 // Small stat card
@@ -32,9 +35,17 @@ const DashboardPage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [capacity, setCapacity] = useState(DEFAULT_AREA_CAPACITY);
   const [resetLoading, setResetLoading] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
 
-  const { counts, globalAlert, alerts, lastUpdated, forceRefresh } =
-    useCameraMonitor(cameras, capacity);
+  const {
+    counts,
+    globalAlert,
+    alerts,
+    lastUpdated,
+    forceRefresh,
+    globalHistory,
+    cameraHistory,
+  } = useCameraMonitor(cameras, capacity, isPaused);
 
   // Load cameras on mount
   useEffect(() => {
@@ -116,15 +127,15 @@ const DashboardPage = () => {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
-                padding: "8px 16px",
-                backgroundColor: "#f0f4f8",
-                borderRadius: "6px",
-                border: "1px solid #e0e7ff",
+                gap: "12px",
+                padding: "10px 16px",
+                backgroundColor: "rgba(15, 23, 42, 0.6)",
+                borderRadius: "8px",
+                border: "1px solid rgba(0, 229, 204, 0.2)",
               }}
             >
               <label
-                style={{ fontSize: "12px", fontWeight: 500, color: "#333" }}
+                style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}
               >
                 Area Capacity:
               </label>
@@ -133,21 +144,110 @@ const DashboardPage = () => {
                 min="1"
                 value={capacity}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (val > 0) setCapacity(val);
+                  const val = e.target.value;
+                  if (val === "") {
+                    setCapacity("");
+                  } else {
+                    const numVal = parseInt(val, 10);
+                    if (numVal > 0) setCapacity(numVal);
+                  }
+                }}
+                onBlur={(e) => {
+                  if (
+                    e.target.value === "" ||
+                    parseInt(e.target.value, 10) < 1
+                  ) {
+                    setCapacity(DEFAULT_AREA_CAPACITY);
+                  }
                 }}
                 style={{
-                  width: "80px",
-                  padding: "6px 8px",
-                  border: "1px solid #ddd",
-                  borderRadius: "4px",
-                  fontSize: "14px",
+                  width: "120px",
+                  padding: "8px 12px",
+                  border: "2px solid rgba(0, 229, 204, 0.3)",
+                  borderRadius: "6px",
+                  fontSize: "15px",
                   fontWeight: 600,
                   textAlign: "center",
+                  backgroundColor: "rgba(0, 229, 204, 0.05)",
+                  color: "#00e5cc",
+                  outlineColor: "rgba(0, 229, 204, 0.5)",
+                  transition: "all 0.2s",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "rgba(0, 229, 204, 0.6)";
+                  e.target.style.backgroundColor = "rgba(0, 229, 204, 0.1)";
+                  e.target.style.boxShadow = "0 0 8px rgba(0, 229, 204, 0.2)";
+                }}
+                onBlurCapture={(e) => {
+                  e.target.style.borderColor = "rgba(0, 229, 204, 0.3)";
+                  e.target.style.backgroundColor = "rgba(0, 229, 204, 0.05)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
-              <span style={{ fontSize: "12px", color: "#666" }}>people</span>
+              <span style={{ fontSize: "13px", color: "#94a3b8" }}>people</span>
             </div>
+            <button
+              className={styles.playPauseBtn}
+              onClick={() => setIsPaused(!isPaused)}
+              disabled={false}
+              title={
+                isPaused
+                  ? "Start monitoring all cameras"
+                  : "Pause monitoring all cameras"
+              }
+              style={{
+                background: isPaused
+                  ? "rgba(34, 197, 94, 0.15)"
+                  : "rgba(239, 68, 68, 0.15)",
+                borderColor: isPaused
+                  ? "rgba(34, 197, 94, 0.3)"
+                  : "rgba(239, 68, 68, 0.3)",
+                color: isPaused ? "#22c55e" : "#ef4444",
+                border: isPaused
+                  ? "1px solid rgba(34, 197, 94, 0.3)"
+                  : "1px solid rgba(239, 68, 68, 0.3)",
+                cursor: "pointer",
+                padding: "6px 12px",
+                borderRadius: "5px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "11px",
+                fontWeight: 600,
+                transition: "all 0.2s",
+              }}
+            >
+              {isPaused ? (
+                <>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                  >
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  Play
+                </>
+              ) : (
+                <>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                  >
+                    <rect x="6" y="4" width="4" height="16" />
+                    <rect x="14" y="4" width="4" height="16" />
+                  </svg>
+                  Pause
+                </>
+              )}
+            </button>
             <button
               className={styles.refreshBtn}
               onClick={forceRefresh}
@@ -380,8 +480,46 @@ const DashboardPage = () => {
                 camera={cam}
                 countData={counts[cam.id]}
                 onDelete={handleDelete}
+                isPaused={isPaused}
               />
             ))}
+          </div>
+        )}
+
+        {/* Analytics Section - Charts below cameras */}
+        {!isPaused && cameras.length > 0 && (
+          <div style={{ marginTop: "40px" }}>
+            {/* Predictions */}
+            <PredictionCard data={globalHistory} capacity={capacity} />
+
+            {/* Global Trend Chart */}
+            <GlobalTrendChart data={globalHistory} capacity={capacity} />
+
+            {/* Camera Trend Charts */}
+            {cameraHistory && Object.keys(cameraHistory).length > 0 && (
+              <div
+                style={{
+                  marginTop: "32px",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+                  gap: "24px",
+                }}
+              >
+                {cameras.map(
+                  (cam) =>
+                    cameraHistory[cam.id] &&
+                    cameraHistory[cam.id].length > 0 && (
+                      <CameraTrendChart
+                        key={`trend-${cam.id}`}
+                        cameraId={cam.id}
+                        cameraName={cam.name}
+                        data={cameraHistory[cam.id]}
+                        capacity={capacity}
+                      />
+                    ),
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>

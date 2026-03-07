@@ -35,8 +35,9 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 # EXISTING CAMERA SYSTEM
 # =========================
 
-# Shared net counts from each camera
+# shared net counts from each camera
 camera_net_counts = {}
+camera_running_status = {}  # Track which cameras are running
 lock = Lock()
 
 # Camera thread storage
@@ -75,6 +76,7 @@ def add_camera():
     thread.start()
 
     camera_threads[name] = thread
+    camera_running_status[name] = True  # Mark as running
 
     return jsonify({
         "id": name,
@@ -154,6 +156,42 @@ def reset_all_camera_counts():
     })
 
 
+@app.route("/cameras/start/<camera_id>", methods=["POST"])
+def start_camera(camera_id):
+    """Start monitoring for a specific camera"""
+    if camera_id not in camera_threads:
+        return jsonify({"message": "Camera not found"}), 404
+    
+    with lock:
+        camera_running_status[camera_id] = True
+    
+    return jsonify({
+        "message": f"Camera {camera_id} started",
+        "camera_id": camera_id,
+        "status": "running",
+        "timestamp": int(time.time())
+    })
+
+
+@app.route("/cameras/stop/<camera_id>", methods=["POST"])
+def stop_camera(camera_id):
+    """Stop monitoring for a specific camera"""
+    if camera_id not in camera_threads:
+        return jsonify({"message": "Camera not found"}), 404
+    
+    with lock:
+        camera_running_status[camera_id] = False
+        # Reset count when stopped
+        camera_net_counts[camera_id] = 0
+    
+    return jsonify({
+        "message": f"Camera {camera_id} stopped",
+        "camera_id": camera_id,
+        "status": "stopped",
+        "timestamp": int(time.time())
+    })
+
+
 @app.route("/net_count", methods=["GET"])
 def get_net_count():
     with lock:
@@ -173,7 +211,9 @@ def update_count():
     net = data["net_count"]
 
     with lock:
-        camera_net_counts[cam_id] = net
+        # Only update count if camera is running
+        if camera_running_status.get(cam_id, True):
+            camera_net_counts[cam_id] = net
 
     return jsonify({"message": "Count updated"})
 

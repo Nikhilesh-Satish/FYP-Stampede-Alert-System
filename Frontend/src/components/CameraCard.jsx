@@ -2,8 +2,10 @@ import { useState } from "react";
 import { cameraApi } from "../api/services";
 import styles from "./CameraCard.module.css";
 
-const CameraCard = ({ camera, countData, onDelete }) => {
+const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const [resetLoading, setResetLoading] = useState(false);
+  const [isIndividuallyPaused, setIsIndividuallyPaused] = useState(false);
+  const [startStopLoading, setStartStopLoading] = useState(false);
   const count = countData?.count ?? null;
   const alertLevel = countData?.alertLevel;
   const timestamp = countData?.timestamp;
@@ -27,6 +29,29 @@ const CameraCard = ({ camera, countData, onDelete }) => {
       alert("Failed to reset count: " + err.message);
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleIndividualPauseToggle = async () => {
+    // Don't allow individual pause if global is paused
+    if (isPaused) return;
+
+    setStartStopLoading(true);
+    try {
+      if (isIndividuallyPaused) {
+        await cameraApi.startCamera(camera.id);
+        setIsIndividuallyPaused(false);
+      } else {
+        await cameraApi.stopCamera(camera.id);
+        setIsIndividuallyPaused(true);
+      }
+    } catch (err) {
+      alert(
+        `Failed to ${isIndividuallyPaused ? "start" : "stop"} camera: ` +
+          err.message,
+      );
+    } finally {
+      setStartStopLoading(false);
     }
   };
 
@@ -65,6 +90,57 @@ const CameraCard = ({ camera, countData, onDelete }) => {
           </p>
         </div>
         <button
+          className={styles.individualPauseBtn}
+          onClick={handleIndividualPauseToggle}
+          disabled={startStopLoading || isPaused}
+          title={
+            isPaused
+              ? "Global monitoring is paused"
+              : isIndividuallyPaused
+                ? "Resume this camera"
+                : "Pause this camera"
+          }
+          style={{
+            background:
+              isIndividuallyPaused || isPaused
+                ? "rgba(239, 68, 68, 0.15)"
+                : "rgba(34, 197, 94, 0.15)",
+            borderColor:
+              isIndividuallyPaused || isPaused
+                ? "rgba(239, 68, 68, 0.3)"
+                : "rgba(34, 197, 94, 0.3)",
+            color: isIndividuallyPaused || isPaused ? "#ef4444" : "#22c55e",
+            opacity: isPaused ? 0.6 : 1,
+          }}
+        >
+          {startStopLoading ? (
+            <span className={styles.spinner} />
+          ) : isIndividuallyPaused || isPaused ? (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="currentColor"
+              strokeWidth="1"
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          ) : (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="currentColor"
+              strokeWidth="1"
+            >
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+          )}
+        </button>
+        <button
           className={styles.delBtn}
           onClick={() => onDelete(camera?.id)}
           title="Remove"
@@ -86,7 +162,23 @@ const CameraCard = ({ camera, countData, onDelete }) => {
 
       {/* Count */}
       <div className={styles.countRow}>
-        {count !== null ? (
+        {isPaused || isIndividuallyPaused ? (
+          <div className={styles.paused}>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="currentColor"
+              strokeWidth="1"
+              style={{ color: "#f97316", marginRight: "4px" }}
+            >
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+            <span>{isPaused ? "Monitoring Paused" : "Camera Paused"}</span>
+          </div>
+        ) : count !== null ? (
           <>
             <div className={styles.countDisplay}>
               <span

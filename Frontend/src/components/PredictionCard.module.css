@@ -1,0 +1,143 @@
+.predictionCard {
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.8) 0%,
+    rgba(30, 41, 59, 0.8) 100%
+  );
+  border: 1px solid rgba(0, 229, 204, 0.2);
+  border-radius: 12px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.predictionCard:hover {
+  border-color: rgba(0, 229, 204, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 229, 204, 0.1);
+}
+
+.title {
+  color: #e2e8f0;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  letter-spacing: -0.5px;
+}
+
+.emptyState {
+  color: #94a3b8;
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+.riskIndicator {
+  border: 2px solid;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+  background: rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.riskIndicator:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.riskLevel {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.riskMessage {
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.metricBox {
+  background: rgba(0, 229, 204, 0.05);
+  border: 1px solid rgba(0, 229, 204, 0.15);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.metricBox:hover {
+  background: rgba(0, 229, 204, 0.1);
+  border-color: rgba(0, 229, 204, 0.3);
+}
+
+.metricLabel {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.metricValue {
+  color: #00e5cc;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.metricSubtext {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.metricCapacity {
+  color: #64748b;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.disclaimer {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .predictionCard {
+    padding: 16px;
+  }
+
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .metricValue {
+    font-size: 20px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+}

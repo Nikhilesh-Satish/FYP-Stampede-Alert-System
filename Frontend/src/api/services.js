@@ -156,4 +156,34 @@ export const cameraApi = {
     });
     return handleResponse(res);
   },
+
+  /**
+   * POST /cameras/start/:cameraId
+   * Starts monitoring for a specific camera
+   */
+  startCamera: async (cameraId) => {
+    const res = await fetch(
+      `${API_BASE_URL}${ENDPOINTS.CAMERA_START}/${cameraId}`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /cameras/stop/:cameraId
+   * Stops monitoring for a specific camera
+   */
+  stopCamera: async (cameraId) => {
+    const res = await fetch(
+      `${API_BASE_URL}${ENDPOINTS.CAMERA_STOP}/${cameraId}`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    return handleResponse(res);
+  },
 };
