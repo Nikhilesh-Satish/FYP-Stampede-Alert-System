@@ -26,6 +26,10 @@ const Navbar = ({ alertCount = 0 }) => {
     <nav className={styles.nav}>
       <div className={styles.logo} onClick={() => navigate('/')}>
         <Logo />
+        <div className={styles.brandText}>
+          <span className={styles.brandTitle}>Crowd Sentinel</span>
+          <span className={styles.brandTag}>CrowdSentinel</span>
+        </div>
       </div>
 
       <div className={styles.links}>

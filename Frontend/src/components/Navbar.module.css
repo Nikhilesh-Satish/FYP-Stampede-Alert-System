@@ -15,6 +15,29 @@
   cursor: pointer;
   display: flex;
   align-items: center;
+  gap: 0.7rem;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.brandTitle {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.04em;
+}
+
+.brandTag {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.64rem;
+  color: #00e5cc;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .links {
