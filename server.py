@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from threading import Thread, Lock
 import time
@@ -37,11 +37,16 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 
 # shared net counts from each camera
 camera_net_counts = {}
+camera_direction_totals = {}
+camera_count_updated_at = {}  # Last time each camera count changed (ms epoch)
 camera_running_status = {}  # Track which cameras are running
+camera_frames = {}  # Latest raw + overlay JPEG frame bytes per camera
 lock = Lock()
 
 # Camera thread storage
 camera_threads = {}
+camera_workers = {}
+camera_stream_paths = {}
 
 
 @app.route("/cameras", methods=["GET"])
@@ -52,7 +57,7 @@ def get_cameras():
         cameras.append({
             "id": cam_id,
             "name": cam_id,
-            "stream_path": "active"
+            "stream_path": camera_stream_paths.get(cam_id, "active")
         })
     return jsonify(cameras)
 
@@ -70,13 +75,28 @@ def add_camera():
         return jsonify({"message": "Camera already exists"}), 400
 
     # Start camera worker thread
-    worker = CameraWorker(name, stream_path, camera_net_counts, lock)
+    worker = CameraWorker(
+        name,
+        stream_path,
+        camera_net_counts,
+        camera_direction_totals,
+        camera_count_updated_at,
+        camera_frames,
+        camera_running_status,
+        lock,
+    )
 
     thread = Thread(target=worker.run, daemon=True)
     thread.start()
 
+    camera_workers[name] = worker
     camera_threads[name] = thread
+    camera_stream_paths[name] = stream_path
     camera_running_status[name] = True  # Mark as running
+    with lock:
+        camera_net_counts[name] = 0
+        camera_direction_totals[name] = {"in_count": 0, "out_count": 0}
+        camera_count_updated_at[name] = int(time.time() * 1000)
 
     return jsonify({
         "id": name,
@@ -93,8 +113,13 @@ def delete_camera(camera_id):
 
     # Remove from tracking
     del camera_threads[camera_id]
+    camera_workers.pop(camera_id, None)
+    camera_stream_paths.pop(camera_id, None)
     with lock:
         camera_net_counts.pop(camera_id, None)
+        camera_direction_totals.pop(camera_id, None)
+        camera_count_updated_at.pop(camera_id, None)
+        camera_frames.pop(camera_id, None)
 
     return jsonify({"message": f"Camera {camera_id} deleted"})
 
@@ -105,12 +130,62 @@ def get_all_counts():
     with lock:
         counts = []
         for cam_id, count in camera_net_counts.items():
+            totals = camera_direction_totals.get(cam_id, {"in_count": 0, "out_count": 0})
             counts.append({
                 "camera_id": cam_id,
                 "count": count,
-                "timestamp": int(time.time())
+                "in_count": totals.get("in_count", 0),
+                "out_count": totals.get("out_count", 0),
+                "timestamp": camera_count_updated_at.get(cam_id, int(time.time() * 1000))
             })
     return jsonify(counts)
+
+
+@app.route("/cameras/stream/<camera_id>", methods=["GET"])
+def get_camera_stream(camera_id):
+    """
+    MJPEG stream endpoint.
+    Query params:
+      - overlay=true|false (default true)
+    """
+    overlay = request.args.get("overlay", "true").lower() != "false"
+    key = "overlay" if overlay else "raw"
+
+    if camera_id not in camera_threads:
+        return jsonify({"message": "Camera not found"}), 404
+
+    def frame_generator():
+        last_ts = -1
+        while True:
+            with lock:
+                frame_entry = camera_frames.get(camera_id)
+
+            if not frame_entry:
+                time.sleep(0.03)
+                continue
+
+            frame_ts = frame_entry.get("timestamp", 0)
+            jpg_bytes = frame_entry.get(key)
+
+            if not jpg_bytes:
+                time.sleep(0.03)
+                continue
+
+            # Avoid re-sending exactly the same frame in a tight loop.
+            if frame_ts == last_ts:
+                time.sleep(0.01)
+                continue
+
+            last_ts = frame_ts
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + jpg_bytes + b"\r\n"
+            )
+
+    return Response(
+        frame_generator(),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 @app.route("/cameras/counts/<camera_id>", methods=["GET"])
@@ -118,11 +193,15 @@ def get_camera_count(camera_id):
     """Get current count for a specific camera"""
     with lock:
         count = camera_net_counts.get(camera_id, 0)
+        totals = camera_direction_totals.get(camera_id, {"in_count": 0, "out_count": 0})
+        ts = camera_count_updated_at.get(camera_id, int(time.time() * 1000))
     
     return jsonify({
         "camera_id": camera_id,
         "count": count,
-        "timestamp": int(time.time())
+        "in_count": totals.get("in_count", 0),
+        "out_count": totals.get("out_count", 0),
+        "timestamp": ts
     })
 
 
@@ -132,27 +211,38 @@ def reset_camera_count(camera_id):
     if camera_id not in camera_threads:
         return jsonify({"message": "Camera not found"}), 404
     
+    worker = camera_workers.get(camera_id)
+    if worker:
+        worker.reset_local_count()
+
     with lock:
         camera_net_counts[camera_id] = 0
+        camera_direction_totals[camera_id] = {"in_count": 0, "out_count": 0}
+        camera_count_updated_at[camera_id] = int(time.time() * 1000)
     
     return jsonify({
         "message": f"Count reset for camera {camera_id}",
         "camera_id": camera_id,
         "count": 0,
-        "timestamp": int(time.time())
+        "timestamp": camera_count_updated_at[camera_id]
     })
 
 
 @app.route("/cameras/reset-all", methods=["POST"])
 def reset_all_camera_counts():
     """Reset the count for all cameras to 0"""
+    for worker in camera_workers.values():
+        worker.reset_local_count()
+
     with lock:
         for cam_id in camera_net_counts:
             camera_net_counts[cam_id] = 0
+            camera_direction_totals[cam_id] = {"in_count": 0, "out_count": 0}
+            camera_count_updated_at[cam_id] = int(time.time() * 1000)
     
     return jsonify({
         "message": "All camera counts reset to 0",
-        "timestamp": int(time.time())
+        "timestamp": int(time.time() * 1000)
     })
 
 
@@ -169,7 +259,7 @@ def start_camera(camera_id):
         "message": f"Camera {camera_id} started",
         "camera_id": camera_id,
         "status": "running",
-        "timestamp": int(time.time())
+        "timestamp": int(time.time() * 1000)
     })
 
 
@@ -179,28 +269,36 @@ def stop_camera(camera_id):
     if camera_id not in camera_threads:
         return jsonify({"message": "Camera not found"}), 404
     
+    worker = camera_workers.get(camera_id)
+    if worker:
+        worker.reset_local_count()
+
     with lock:
         camera_running_status[camera_id] = False
         # Reset count when stopped
         camera_net_counts[camera_id] = 0
+        camera_direction_totals[camera_id] = {"in_count": 0, "out_count": 0}
+        camera_count_updated_at[camera_id] = int(time.time() * 1000)
     
     return jsonify({
         "message": f"Camera {camera_id} stopped",
         "camera_id": camera_id,
         "status": "stopped",
-        "timestamp": int(time.time())
+        "timestamp": camera_count_updated_at[camera_id]
     })
 
 
 @app.route("/net_count", methods=["GET"])
 def get_net_count():
     with lock:
-        total_inside = sum(camera_net_counts.values())
+        total_net = sum(camera_net_counts.values())
 
     return jsonify({
-        "total_people_inside": total_inside,
+        "global_net_count": total_net,
+        "total_people_inside": total_net,
         "per_camera": camera_net_counts,
-        "timestamp": int(time.time())
+        "per_camera_totals": camera_direction_totals,
+        "timestamp": int(time.time() * 1000)
     })
 
 
@@ -214,6 +312,7 @@ def update_count():
         # Only update count if camera is running
         if camera_running_status.get(cam_id, True):
             camera_net_counts[cam_id] = net
+            camera_count_updated_at[cam_id] = int(time.time() * 1000)
 
     return jsonify({"message": "Count updated"})
 

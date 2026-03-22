@@ -10,6 +10,7 @@ export const ENDPOINTS = {
   CAMERAS: "/cameras",
   ADD_CAMERA: "/cameras/add",
   CAMERA_COUNTS: "/cameras/counts", // GET /cameras/counts  or  /cameras/counts/:id
+  CAMERA_STREAM: "/cameras/stream", // GET /cameras/stream/:id?overlay=true|false (MJPEG)
   RESET_COUNT: "/cameras/reset", // POST /cameras/reset/:id
   RESET_ALL_COUNTS: "/cameras/reset-all", // POST /cameras/reset-all
   CAMERA_START: "/cameras/start", // POST /cameras/start/:id

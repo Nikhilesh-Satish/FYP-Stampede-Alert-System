@@ -120,6 +120,15 @@ export const cameraApi = {
   },
 
   /**
+   * Builds MJPEG URL for camera live stream.
+   * GET /cameras/stream/:cameraId?overlay=true|false
+   */
+  getCameraStreamUrl: (cameraId, { overlay = true } = {}) => {
+    const encodedId = encodeURIComponent(cameraId);
+    return `${API_BASE_URL}${ENDPOINTS.CAMERA_STREAM}/${encodedId}?overlay=${overlay ? "true" : "false"}`;
+  },
+
+  /**
    * DELETE /cameras/:id
    */
   deleteCamera: async (cameraId) => {

@@ -1,0 +1,15 @@
+# Copy this to crowd_data.yaml and update paths for your machine.
+# YOLO dataset format:
+#   dataset_root/
+#     images/train/*.jpg
+#     images/val/*.jpg
+#     labels/train/*.txt
+#     labels/val/*.txt
+
+path: /ABSOLUTE/PATH/TO/dataset_root
+train: images/train
+val: images/val
+# test: images/test
+
+names:
+  0: person

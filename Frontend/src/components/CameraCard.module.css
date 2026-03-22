@@ -118,6 +118,88 @@
   cursor: not-allowed;
 }
 
+.streamWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.streamControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.streamToggle,
+.streamZoomBtn {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.streamToggle:hover,
+.streamZoomBtn:hover:not(:disabled) {
+  border-color: rgba(0, 229, 204, 0.55);
+  color: #00e5cc;
+  background: rgba(0, 229, 204, 0.08);
+}
+
+.streamZoomBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.streamPreview {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f172a;
+  padding: 0;
+  cursor: zoom-in;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+}
+
+.streamPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.streamPreview:disabled {
+  cursor: not-allowed;
+}
+
+.streamError {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fca5a5;
+  background: rgba(15, 23, 42, 0.85);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+}
+
+.streamLegend {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.76rem;
+  color: #c4cedb;
+  line-height: 1.35;
+}
+
 /* Count row */
 .countRow {
   display: flex;
@@ -125,24 +207,45 @@
   gap: 1rem;
 }
 
-.countDisplay {
+.countSummary {
   display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
+  align-items: stretch;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.countNum {
+.countMetric {
+  min-width: 92px;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.countLabel {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+}
+
+.countValueIn,
+.countValueOut {
   font-family: "Rajdhani", sans-serif;
-  font-size: 2.6rem;
+  font-size: 2rem;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
 }
 
-.countUnit {
-  font-family: "Rajdhani", sans-serif;
-  font-size: 0.8rem;
-  color: #e0e6f0;
+.countValueIn {
+  color: #22c55e;
+}
+
+.countValueOut {
+  color: #f97316;
 }
 
 .countControls {
@@ -325,4 +428,69 @@
 
 .dot {
   color: #1e2a3a;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(2, 6, 23, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modalBody {
+  width: min(1080px, 96vw);
+  background: #0f1923;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.modalHeader h4 {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  color: #e2e8f0;
+}
+
+.modalHeader button {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.8);
+  color: #cbd5e1;
+  border-radius: 7px;
+  padding: 0.32rem 0.6rem;
+  font-family: "Rajdhani", sans-serif;
+  cursor: pointer;
+}
+
+.modalStream {
+  width: 100%;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+
+.modalStream img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.modalHint {
+  margin: 0;
+  padding: 0.65rem 1rem 0.9rem;
+  color: #cbd5e1;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.83rem;
 }

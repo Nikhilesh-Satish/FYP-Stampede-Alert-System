@@ -3,8 +3,8 @@ import { cameraApi } from "../api/services";
 import { getAlertLevel, DEFAULT_AREA_CAPACITY } from "../api/config";
 import { useChartData } from "../hooks/useChartData";
 
-// Polls camera counts from your API every 10 seconds (synced with camera worker)
-const POLL_INTERVAL_MS = 10 * 1000;
+// Poll camera counts once per second for near real-time dashboard updates.
+const POLL_INTERVAL_MS = 1000;
 
 export const useCameraMonitor = (
   cameras,
@@ -59,9 +59,14 @@ export const useCameraMonitor = (
       const newAlerts = [];
 
       // Collect individual counts
-      countData.forEach(({ camera_id, count, timestamp }) => {
+      countData.forEach(({ camera_id, count, in_count, out_count, timestamp }) => {
         if (count === null || count === undefined) return;
-        newCounts[camera_id] = { count, timestamp };
+        newCounts[camera_id] = {
+          count,
+          inCount: in_count ?? 0,
+          outCount: out_count ?? 0,
+          timestamp,
+        };
         totalCount += count;
 
         // Add data point to camera history (only if not paused)
@@ -70,17 +75,19 @@ export const useCameraMonitor = (
         }
       });
 
+      const clampedTotalCount = Math.max(0, totalCount);
+
       // Add global data point (only if not paused)
       if (!isPaused) {
-        addGlobalDataPoint(totalCount);
+        addGlobalDataPoint(clampedTotalCount);
       }
 
       // Calculate global alert based on total occupancy
-      const globalAlertLevel = getAlertLevel(totalCount, capacity);
-      const occupancyPercent = Math.round((totalCount / capacity) * 100);
+      const globalAlertLevel = getAlertLevel(clampedTotalCount, capacity);
+      const occupancyPercent = Math.round((clampedTotalCount / capacity) * 100);
 
       setGlobalAlert({
-        totalCount,
+        totalCount: clampedTotalCount,
         occupancyPercent,
         alertLevel: globalAlertLevel,
         timestamp: new Date().toISOString(),
@@ -90,13 +97,13 @@ export const useCameraMonitor = (
       if (globalAlertLevel.level !== "SAFE") {
         let alertMessage = "";
 
-        if (totalCount > capacity) {
-          const exceeded = totalCount - capacity;
-          alertMessage = `🚨 CAPACITY EXCEEDED: ${exceeded} people over safe limit (${totalCount}/${capacity})`;
+        if (clampedTotalCount > capacity) {
+          const exceeded = clampedTotalCount - capacity;
+          alertMessage = `🚨 CAPACITY EXCEEDED: ${exceeded} people over safe limit (${clampedTotalCount}/${capacity})`;
         } else if (occupancyPercent >= 80) {
-          alertMessage = `⚠️ Approaching safe capacity: ${totalCount}/${capacity} people (${occupancyPercent}%)`;
+          alertMessage = `⚠️ Approaching safe capacity: ${clampedTotalCount}/${capacity} people (${occupancyPercent}%)`;
         } else {
-          alertMessage = `Area occupancy at ${occupancyPercent}% (${totalCount}/${capacity} people)`;
+          alertMessage = `Area occupancy at ${occupancyPercent}% (${clampedTotalCount}/${capacity} people)`;
         }
 
         newAlerts.push({

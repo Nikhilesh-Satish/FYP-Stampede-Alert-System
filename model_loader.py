@@ -5,7 +5,7 @@ from ultralytics import YOLO
 FILE_ID = "1im4qMsoiBrEEs_EyUGofjz68_qdYcSJl"
 
 MODEL_DIR = "models"
-MODEL_PATH = os.path.join(MODEL_DIR, "stampede_model.pt")
+MODEL_PATH = os.getenv("STAMPEDE_MODEL_PATH", os.path.join(MODEL_DIR, "stampede_model.pt"))
 
 # ✅ Global cache so model loads only once
 _cached_model = None

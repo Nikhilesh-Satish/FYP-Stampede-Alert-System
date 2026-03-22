@@ -1,0 +1,7 @@
+path: /Users/nik/FYP-Stampede-Alert-System/dataset
+train: train/images
+val: valid/images
+test: test/images
+
+names:
+  0: person

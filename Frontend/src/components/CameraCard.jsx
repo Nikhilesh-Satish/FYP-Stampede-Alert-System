@@ -6,9 +6,17 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const [resetLoading, setResetLoading] = useState(false);
   const [isIndividuallyPaused, setIsIndividuallyPaused] = useState(false);
   const [startStopLoading, setStartStopLoading] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(true);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const [streamError, setStreamError] = useState(false);
   const count = countData?.count ?? null;
+  const inCount = countData?.inCount ?? 0;
+  const outCount = countData?.outCount ?? 0;
   const alertLevel = countData?.alertLevel;
   const timestamp = countData?.timestamp;
+  const streamUrl = cameraApi.getCameraStreamUrl(camera?.id, {
+    overlay: showOverlay,
+  });
 
   const fmtTime = (ts) => {
     if (!ts) return "Pending first update…";
@@ -56,200 +64,268 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   };
 
   return (
-    <div
-      className={styles.card}
-      style={{
-        borderColor: alertLevel
-          ? `${alertLevel.color}44`
-          : "rgba(255,255,255,0.07)",
-        background:
-          alertLevel?.level !== "SAFE" && alertLevel
-            ? alertLevel.bg
-            : "#1a2535",
-      }}
-    >
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.camIcon}>
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-          >
-            <path d="M23 7l-7 5 7 5V7z" />
-            <rect x="1" y="5" width="15" height="14" rx="2" />
-          </svg>
-        </div>
-        <div className={styles.camMeta}>
-          <h3 className={styles.camName}>{camera?.name || "Unnamed Camera"}</h3>
-          <p className={styles.camPath}>
-            {camera?.stream_path || camera?.streamPath || "No path specified"}
-          </p>
-        </div>
-        <button
-          className={styles.individualPauseBtn}
-          onClick={handleIndividualPauseToggle}
-          disabled={startStopLoading || isPaused}
-          title={
-            isPaused
-              ? "Global monitoring is paused"
-              : isIndividuallyPaused
-                ? "Resume this camera"
-                : "Pause this camera"
-          }
-          style={{
-            background:
-              isIndividuallyPaused || isPaused
-                ? "rgba(239, 68, 68, 0.15)"
-                : "rgba(34, 197, 94, 0.15)",
-            borderColor:
-              isIndividuallyPaused || isPaused
-                ? "rgba(239, 68, 68, 0.3)"
-                : "rgba(34, 197, 94, 0.3)",
-            color: isIndividuallyPaused || isPaused ? "#ef4444" : "#22c55e",
-            opacity: isPaused ? 0.6 : 1,
-          }}
-        >
-          {startStopLoading ? (
-            <span className={styles.spinner} />
-          ) : isIndividuallyPaused || isPaused ? (
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              stroke="currentColor"
-              strokeWidth="1"
-            >
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-          ) : (
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              stroke="currentColor"
-              strokeWidth="1"
-            >
-              <rect x="6" y="4" width="4" height="16" />
-              <rect x="14" y="4" width="4" height="16" />
-            </svg>
-          )}
-        </button>
-        <button
-          className={styles.delBtn}
-          onClick={() => onDelete(camera?.id)}
-          title="Remove"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14H6L5 6" />
-            <path d="M10 11v6M14 11v6M9 6V4h6v2" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Count */}
-      <div className={styles.countRow}>
-        {isPaused || isIndividuallyPaused ? (
-          <div className={styles.paused}>
+    <>
+      <div
+        className={styles.card}
+        style={{
+          borderColor: alertLevel
+            ? `${alertLevel.color}44`
+            : "rgba(255,255,255,0.07)",
+          background:
+            alertLevel?.level !== "SAFE" && alertLevel
+              ? alertLevel.bg
+              : "#1a2535",
+        }}
+      >
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.camIcon}>
             <svg
               width="18"
               height="18"
               viewBox="0 0 24 24"
-              fill="currentColor"
+              fill="none"
               stroke="currentColor"
-              strokeWidth="1"
-              style={{ color: "#f97316", marginRight: "4px" }}
+              strokeWidth="1.6"
             >
-              <rect x="6" y="4" width="4" height="16" />
-              <rect x="14" y="4" width="4" height="16" />
+              <path d="M23 7l-7 5 7 5V7z" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
             </svg>
-            <span>{isPaused ? "Monitoring Paused" : "Camera Paused"}</span>
           </div>
-        ) : count !== null ? (
-          <>
-            <div className={styles.countDisplay}>
-              <span
-                className={styles.countNum}
-                style={{ color: alertLevel?.color || "#00e5cc" }}
+          <div className={styles.camMeta}>
+            <h3 className={styles.camName}>{camera?.name || "Unnamed Camera"}</h3>
+            <p className={styles.camPath}>
+              {camera?.stream_path || camera?.streamPath || "No path specified"}
+            </p>
+          </div>
+          <button
+            className={styles.individualPauseBtn}
+            onClick={handleIndividualPauseToggle}
+            disabled={startStopLoading || isPaused}
+            title={
+              isPaused
+                ? "Global monitoring is paused"
+                : isIndividuallyPaused
+                  ? "Resume this camera"
+                  : "Pause this camera"
+            }
+            style={{
+              background:
+                isIndividuallyPaused || isPaused
+                  ? "rgba(239, 68, 68, 0.15)"
+                  : "rgba(34, 197, 94, 0.15)",
+              borderColor:
+                isIndividuallyPaused || isPaused
+                  ? "rgba(239, 68, 68, 0.3)"
+                  : "rgba(34, 197, 94, 0.3)",
+              color: isIndividuallyPaused || isPaused ? "#ef4444" : "#22c55e",
+              opacity: isPaused ? 0.6 : 1,
+            }}
+          >
+            {startStopLoading ? (
+              <span className={styles.spinner} />
+            ) : isIndividuallyPaused || isPaused ? (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="1"
               >
-                {count.toLocaleString()}
-              </span>
-              <span className={styles.countUnit}>people detected</span>
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            ) : (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="1"
+              >
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
+              </svg>
+            )}
+          </button>
+          <button
+            className={styles.delBtn}
+            onClick={() => onDelete(camera?.id)}
+            title="Remove"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v6M14 11v6M9 6V4h6v2" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Live Camera Stream */}
+        <div className={styles.streamWrap}>
+          <div className={styles.streamControls}>
+            <button
+              type="button"
+              className={styles.streamToggle}
+              onClick={() => setShowOverlay((prev) => !prev)}
+            >
+              {showOverlay ? "Show Raw Feed" : "Show Algorithm Overlay"}
+            </button>
+            <button
+              type="button"
+              className={styles.streamZoomBtn}
+              onClick={() => setIsZoomOpen(true)}
+              disabled={streamError}
+            >
+              Magnify
+            </button>
+          </div>
+          <button
+            type="button"
+            className={styles.streamPreview}
+            onClick={() => setIsZoomOpen(true)}
+            disabled={streamError}
+          >
+            <img
+              src={streamUrl}
+              alt={`${camera?.name || "Camera"} live stream`}
+              onError={() => setStreamError(true)}
+              onLoad={() => setStreamError(false)}
+            />
+            {streamError && (
+              <span className={styles.streamError}>Stream unavailable</span>
+            )}
+          </button>
+          <p className={styles.streamLegend}>
+            {showOverlay
+              ? "Overlay: green boxes + tracker IDs. Rule: left->right = IN, right->left = OUT."
+              : "Raw live feed without algorithm annotations."}
+          </p>
+        </div>
+
+        {/* Count */}
+        <div className={styles.countRow}>
+          {isPaused || isIndividuallyPaused ? (
+            <div className={styles.paused}>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="1"
+                style={{ color: "#f97316", marginRight: "4px" }}
+              >
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
+              </svg>
+              <span>{isPaused ? "Monitoring Paused" : "Camera Paused"}</span>
             </div>
-            <div className={styles.countControls}>
-              {alertLevel && (
-                <div
-                  className={styles.badge}
-                  style={{
-                    background: alertLevel.bg,
-                    color: alertLevel.color,
-                    borderColor: `${alertLevel.color}44`,
-                  }}
-                >
-                  {alertLevel.level === "CRITICAL" && (
-                    <span
-                      className={styles.blinkDot}
-                      style={{ background: alertLevel.color }}
-                    />
-                  )}
-                  {alertLevel.label}
+          ) : count !== null ? (
+            <>
+              <div className={styles.countSummary}>
+                <div className={styles.countMetric}>
+                  <span className={styles.countLabel}>IN</span>
+                  <span className={styles.countValueIn}>
+                    {inCount.toLocaleString()}
+                  </span>
                 </div>
-              )}
-              <button
-                className={styles.resetBtn}
-                onClick={handleResetCount}
-                disabled={resetLoading}
-                title="Reset count to 0"
-              >
-                {resetLoading ? (
-                  <span className={styles.resetSpinner} />
-                ) : (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                <div className={styles.countMetric}>
+                  <span className={styles.countLabel}>OUT</span>
+                  <span className={styles.countValueOut}>
+                    {outCount.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <div className={styles.countControls}>
+                {alertLevel && (
+                  <div
+                    className={styles.badge}
+                    style={{
+                      background: alertLevel.bg,
+                      color: alertLevel.color,
+                      borderColor: `${alertLevel.color}44`,
+                    }}
                   >
-                    <path d="M21.5 2v6h-6M2.5 22v-6h6" />
-                    <path d="M2 11.5a10 10 0 0 1 18.8-4.3" />
-                    <path d="M22 12.5a10 10 0 0 1-18.8 4.2" />
-                  </svg>
+                    {alertLevel.level === "CRITICAL" && (
+                      <span
+                        className={styles.blinkDot}
+                        style={{ background: alertLevel.color }}
+                      />
+                    )}
+                    {alertLevel.label}
+                  </div>
                 )}
-              </button>
+                <button
+                  className={styles.resetBtn}
+                  onClick={handleResetCount}
+                  disabled={resetLoading}
+                  title="Reset count to 0"
+                >
+                  {resetLoading ? (
+                    <span className={styles.resetSpinner} />
+                  ) : (
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21.5 2v6h-6M2.5 22v-6h6" />
+                      <path d="M2 11.5a10 10 0 0 1 18.8-4.3" />
+                      <path d="M22 12.5a10 10 0 0 1-18.8 4.2" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className={styles.pending}>
+              <div className={styles.spinner} />
+              Awaiting data…
             </div>
-          </>
-        ) : (
-          <div className={styles.pending}>
-            <div className={styles.spinner} />
-            Awaiting data…
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className={styles.footer}>
+          <span>Last update: {fmtTime(timestamp)}</span>
+          <span className={styles.dot}>·</span>
+          <span>Counts refresh every ~1s</span>
+        </div>
       </div>
 
-      {/* Footer */}
-      <div className={styles.footer}>
-        <span>Last update: {fmtTime(timestamp)}</span>
-        <span className={styles.dot}>·</span>
-        <span>Refreshes every 10 min</span>
-      </div>
-    </div>
+      {isZoomOpen && (
+        <div className={styles.modalOverlay} onClick={() => setIsZoomOpen(false)}>
+          <div className={styles.modalBody} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h4>{camera?.name || "Camera"} Live View</h4>
+              <button onClick={() => setIsZoomOpen(false)}>Close</button>
+            </div>
+            <div className={styles.modalStream}>
+              <img src={streamUrl} alt={`${camera?.name || "Camera"} magnified stream`} />
+            </div>
+            <p className={styles.modalHint}>
+              {showOverlay
+                ? "Algorithm overlay is enabled: ID boxes, vertical counting line, IN/OUT logic."
+                : "Raw feed view is enabled."}
+            </p>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
