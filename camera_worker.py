@@ -52,6 +52,13 @@ class CameraWorker:
         self.imgsz = int(os.getenv("DETECTION_IMGSZ", "768"))
         self.max_det = int(os.getenv("DETECTION_MAX_DET", "1200"))
         self.jpeg_quality = int(os.getenv("STREAM_JPEG_QUALITY", "80"))
+        self.stream_sleep_sec = float(os.getenv("STREAM_FRAME_DELAY_SEC", "0.03"))
+        self.inference_every_n_frames = max(1, int(os.getenv("INFERENCE_EVERY_N_FRAMES", "3")))
+        self.max_inference_fps = float(os.getenv("MAX_INFERENCE_FPS", "4"))
+        self.inference_scale = float(os.getenv("INFERENCE_SCALE", "1.0"))
+        self.realtime_sync = os.getenv("REALTIME_SYNC_ENABLED", "true").lower() != "false"
+        self.max_frame_skip = max(0, int(os.getenv("MAX_FRAME_SKIP", "6")))
+        self.source_fps_override = float(os.getenv("SOURCE_FPS_OVERRIDE", "0"))
 
         self.tile_enabled = os.getenv("TILE_INFERENCE_ENABLED", "true").lower() != "false"
         self.tile_size = int(os.getenv("TILE_SIZE", "640"))
@@ -60,6 +67,13 @@ class CameraWorker:
 
         self.last_reset_time = time.time()
         self.report_interval_sec = int(os.getenv("REPORT_INTERVAL_SEC", "10"))
+        self.frame_index = 0
+        self.last_inference_time = 0.0
+        self.cached_boxes = []
+        self.cached_ids = []
+        self.source_frames_seen = 0
+        self.playback_started_at = None
+        self.source_frame_interval = None
 
     def _line_x(self):
         return self.LINE_X if self.LINE_X is not None else 320
@@ -176,8 +190,23 @@ class CameraWorker:
                 tiles.append((crop, tile_x, tile_y))
         return tiles
 
+    def _prepare_inference_frame(self, frame):
+        if self.inference_scale >= 0.999:
+            return frame, 1.0
+
+        scale = max(0.1, min(1.0, self.inference_scale))
+        resized = cv2.resize(
+            frame,
+            None,
+            fx=scale,
+            fy=scale,
+            interpolation=cv2.INTER_AREA,
+        )
+        return resized, scale
+
     def _predict_frame(self, frame):
-        tiles = self._make_tiles(frame)
+        inference_frame, scale = self._prepare_inference_frame(frame)
+        tiles = self._make_tiles(inference_frame)
         detections = []
 
         for start_idx in range(0, len(tiles), self.tile_batch):
@@ -207,6 +236,13 @@ class CameraWorker:
                     x2 += offset_x
                     y2 += offset_y
 
+                    if scale != 1.0:
+                        inv_scale = 1.0 / scale
+                        x1 *= inv_scale
+                        y1 *= inv_scale
+                        x2 *= inv_scale
+                        y2 *= inv_scale
+
                     x1 = max(0.0, x1)
                     y1 = max(0.0, y1)
                     x2 = min(float(frame.shape[1]), x2)
@@ -223,6 +259,53 @@ class CameraWorker:
                     )
 
         return self._nms(detections)
+
+    def _should_run_inference(self, now):
+        if self.frame_index % self.inference_every_n_frames != 0:
+            return False
+
+        if self.max_inference_fps > 0:
+            min_interval = 1.0 / self.max_inference_fps
+            if now - self.last_inference_time < min_interval:
+                return False
+
+        return True
+
+    def _resolve_source_frame_interval(self, cap):
+        fps = self.source_fps_override
+        if fps <= 0:
+            fps = cap.get(cv2.CAP_PROP_FPS) or 0
+
+        if fps and np.isfinite(fps) and fps > 0.5:
+            return 1.0 / fps
+
+        return None
+
+    def _pace_stream(self, cap):
+        if not self.realtime_sync or self.source_frame_interval is None:
+            if self.stream_sleep_sec > 0:
+                time.sleep(self.stream_sleep_sec)
+            return
+
+        expected_elapsed = self.source_frames_seen * self.source_frame_interval
+        actual_elapsed = time.time() - self.playback_started_at
+        lag = actual_elapsed - expected_elapsed
+
+        if lag > self.source_frame_interval and self.max_frame_skip > 0:
+            frames_to_skip = min(self.max_frame_skip, int(lag / self.source_frame_interval))
+            skipped = 0
+            while skipped < frames_to_skip and cap.grab():
+                skipped += 1
+
+            if skipped:
+                self.source_frames_seen += skipped
+                self.frame_index += skipped
+            return
+
+        if lag < 0:
+            time.sleep(min(-lag, self.stream_sleep_sec))
+        elif self.stream_sleep_sec > 0:
+            time.sleep(self.stream_sleep_sec)
 
     def _update_tracks(self, detections, now):
         active_track_ids = [
@@ -378,13 +461,20 @@ class CameraWorker:
             print(f"Camera {self.camera_id}: failed to open '{self.video_path}'")
             return
 
+        self.source_frame_interval = self._resolve_source_frame_interval(cap)
+        self.playback_started_at = time.time()
+
         print(f"Camera {self.camera_id} started processing")
 
         while True:
             ret, frame = cap.read()
             if not ret:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                self.source_frames_seen = 0
+                self.playback_started_at = time.time()
                 continue
+            self.frame_index += 1
+            self.source_frames_seen += 1
             if self.LINE_X is None:
                 self.LINE_X = frame.shape[1] // 2
 
@@ -408,14 +498,17 @@ class CameraWorker:
                             "overlay": overlay_jpg,
                             "timestamp": int(time.time() * 1000),
                         }
-                time.sleep(0.03)
+                self._pace_stream(cap)
                 continue
 
-            detections = self._predict_frame(frame)
-            boxes, ids = self._update_tracks(detections, time.time())
+            now = time.time()
+            if self._should_run_inference(now):
+                detections = self._predict_frame(frame)
+                self.cached_boxes, self.cached_ids = self._update_tracks(detections, now)
+                self.last_inference_time = now
 
             raw_jpg = self._encode_jpeg(frame)
-            overlay_jpg = self._encode_jpeg(self._draw_overlay(frame, boxes, ids))
+            overlay_jpg = self._encode_jpeg(self._draw_overlay(frame, self.cached_boxes, self.cached_ids))
             if raw_jpg and overlay_jpg:
                 with self.lock:
                     self.shared_frames[self.camera_id] = {
@@ -439,4 +532,4 @@ class CameraWorker:
                 )
                 self.last_reset_time = time.time()
 
-            time.sleep(0.03)
+            self._pace_stream(cap)

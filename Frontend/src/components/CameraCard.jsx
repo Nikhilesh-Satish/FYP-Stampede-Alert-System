@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { cameraApi } from "../api/services";
 import styles from "./CameraCard.module.css";
 import { usePointerGlow } from "../hooks/usePointerGlow";
@@ -11,6 +12,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const [showOverlay, setShowOverlay] = useState(true);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [streamError, setStreamError] = useState(false);
+  const [zoomStreamError, setZoomStreamError] = useState(false);
   const count = countData?.count ?? null;
   const inCount = countData?.inCount ?? 0;
   const outCount = countData?.outCount ?? 0;
@@ -61,6 +63,31 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
     } finally {
       setStartStopLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (!isZoomOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsZoomOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isZoomOpen]);
+
+  const openZoom = () => {
+    setZoomStreamError(false);
+    setIsZoomOpen(true);
   };
 
   return (
@@ -137,12 +164,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
             <button type="button" className={styles.streamToggle} onClick={() => setShowOverlay((prev) => !prev)}>
               {showOverlay ? "Show Raw Feed" : "Show Algorithm Overlay"}
             </button>
-            <button
-              type="button"
-              className={styles.streamZoomBtn}
-              onClick={() => setIsZoomOpen(true)}
-              disabled={streamError}
-            >
+            <button type="button" className={styles.streamZoomBtn} onClick={openZoom}>
               Magnify
             </button>
           </div>
@@ -150,7 +172,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
           <button
             type="button"
             className={styles.streamPreview}
-            onClick={() => setIsZoomOpen(true)}
+            onClick={openZoom}
             disabled={streamError}
           >
             <img
@@ -239,22 +261,41 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
         </div>
       </div>
 
-      {isZoomOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsZoomOpen(false)}>
-          <div className={styles.modalBody} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h4>{camera?.name || "Camera"} Live Feed</h4>
-              <button onClick={() => setIsZoomOpen(false)}>Close</button>
+      {isZoomOpen &&
+        createPortal(
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setIsZoomOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${camera?.name || "Camera"} live feed`}
+          >
+            <div className={styles.modalBody} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h4>{camera?.name || "Camera"} Live Feed</h4>
+                <button type="button" onClick={() => setIsZoomOpen(false)}>
+                  Close
+                </button>
+              </div>
+              <div className={styles.modalStream}>
+                {zoomStreamError ? (
+                  <div className={styles.modalError}>Unable to load the magnified stream.</div>
+                ) : (
+                  <img
+                    src={streamUrl}
+                    alt={`${camera?.name || "Camera"} magnified stream`}
+                    onError={() => setZoomStreamError(true)}
+                  />
+                )}
+              </div>
+              <p className={styles.modalHint}>
+                {showOverlay ? "Algorithm overlay active in zoom view." : "Raw live feed in zoom view."}
+              </p>
             </div>
-            <div className={styles.modalStream}>
-              <img src={streamUrl} alt={`${camera?.name || "Camera"} magnified stream`} />
-            </div>
-            <p className={styles.modalHint}>
-              {showOverlay ? "Algorithm overlay active in zoom view." : "Raw live feed in zoom view."}
-            </p>
           </div>
-        </div>
-      )}
+          ,
+          document.body,
+        )}
     </>
   );
 };
