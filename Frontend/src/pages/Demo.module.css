@@ -1,24 +1,94 @@
 .demoForm {
-  width: 70%;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  background-color: #1a2535;
-  margin-bottom: 2rem;
+  gap: 1.15rem;
+  padding: 1.6rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(16, 29, 48, 0.9), rgba(8, 16, 31, 0.96));
+  box-shadow: var(--shadow);
+}
+
+.formHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.kicker {
+  color: var(--accent);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  line-height: 0.98;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
 }
 
 .inputField {
-  width: 80%;
-  height: 2.5rem;
-  background-color: #071934;
-  color: #dfe5ec;
+  width: 100%;
+  min-height: 56px;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(150, 193, 255, 0.14);
+  background: rgba(8, 17, 31, 0.8);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.inputField::placeholder {
+  color: var(--soft);
+}
+
+.inputField:focus {
+  border-color: rgba(101, 242, 215, 0.4);
+  box-shadow: 0 0 0 4px rgba(101, 242, 215, 0.08);
+}
+
+.textarea {
+  min-height: 150px;
+  resize: vertical;
 }
 
 .submitButton {
-  background-color: #2a144d;
-  color: #dfe5ec;
-  margin-bottom: 1rem;
-  height: 2rem;
-  width: 4rem;
+  align-self: flex-start;
+  padding: 0.95rem 1.35rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #ffb84d 0%, #ff6b5f 100%);
+  color: #08111f;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 16px 36px rgba(255, 107, 95, 0.24);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.submitButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 46px rgba(255, 107, 95, 0.3);
+}
+
+@media (max-width: 700px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -13,7 +13,7 @@ const AlertBanner = ({ alerts }) => {
 
   return (
     <div
-      className={styles.banner}
+      className={`${styles.banner} ${styles[top.alertLevel.level?.toLowerCase()] || ""}`}
       style={{
         background: top.alertLevel.bg,
         borderColor: `${top.alertLevel.color}44`,

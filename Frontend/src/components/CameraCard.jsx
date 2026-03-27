@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { cameraApi } from "../api/services";
 import styles from "./CameraCard.module.css";
+import { usePointerGlow } from "../hooks/usePointerGlow";
 
 const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
+  const glow = usePointerGlow();
   const [resetLoading, setResetLoading] = useState(false);
   const [isIndividuallyPaused, setIsIndividuallyPaused] = useState(false);
   const [startStopLoading, setStartStopLoading] = useState(false);
@@ -41,7 +43,6 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   };
 
   const handleIndividualPauseToggle = async () => {
-    // Don't allow individual pause if global is paused
     if (isPaused) return;
 
     setStartStopLoading(true);
@@ -55,8 +56,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
       }
     } catch (err) {
       alert(
-        `Failed to ${isIndividuallyPaused ? "start" : "stop"} camera: ` +
-          err.message,
+        `Failed to ${isIndividuallyPaused ? "start" : "stop"} camera: ` + err.message,
       );
     } finally {
       setStartStopLoading(false);
@@ -66,117 +66,75 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   return (
     <>
       <div
+        ref={glow.ref}
+        {...glow.glowProps}
         className={styles.card}
         style={{
-          borderColor: alertLevel
-            ? `${alertLevel.color}44`
-            : "rgba(255,255,255,0.07)",
+          borderColor: alertLevel ? `${alertLevel.color}40` : "var(--line)",
           background:
             alertLevel?.level !== "SAFE" && alertLevel
-              ? alertLevel.bg
-              : "#1a2535",
+              ? `linear-gradient(180deg, ${alertLevel.bg}, rgba(8,16,31,0.98))`
+              : undefined,
         }}
       >
-        {/* Header */}
         <div className={styles.header}>
-          <div className={styles.camIcon}>
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-            >
-              <path d="M23 7l-7 5 7 5V7z" />
-              <rect x="1" y="5" width="15" height="14" rx="2" />
-            </svg>
-          </div>
-          <div className={styles.camMeta}>
-            <h3 className={styles.camName}>{camera?.name || "Unnamed Camera"}</h3>
-            <p className={styles.camPath}>
-              {camera?.stream_path || camera?.streamPath || "No path specified"}
-            </p>
-          </div>
-          <button
-            className={styles.individualPauseBtn}
-            onClick={handleIndividualPauseToggle}
-            disabled={startStopLoading || isPaused}
-            title={
-              isPaused
-                ? "Global monitoring is paused"
-                : isIndividuallyPaused
-                  ? "Resume this camera"
-                  : "Pause this camera"
-            }
-            style={{
-              background:
-                isIndividuallyPaused || isPaused
-                  ? "rgba(239, 68, 68, 0.15)"
-                  : "rgba(34, 197, 94, 0.15)",
-              borderColor:
-                isIndividuallyPaused || isPaused
-                  ? "rgba(239, 68, 68, 0.3)"
-                  : "rgba(34, 197, 94, 0.3)",
-              color: isIndividuallyPaused || isPaused ? "#ef4444" : "#22c55e",
-              opacity: isPaused ? 0.6 : 1,
-            }}
-          >
-            {startStopLoading ? (
-              <span className={styles.spinner} />
-            ) : isIndividuallyPaused || isPaused ? (
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1"
-              >
-                <polygon points="5 3 19 12 5 21 5 3" />
+          <div className={styles.cameraSignature}>
+            <div className={styles.camIcon}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <path d="M23 7l-7 5 7 5V7z" />
+                <rect x="1" y="5" width="15" height="14" rx="2" />
               </svg>
-            ) : (
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1"
-              >
-                <rect x="6" y="4" width="4" height="16" />
-                <rect x="14" y="4" width="4" height="16" />
-              </svg>
-            )}
-          </button>
-          <button
-            className={styles.delBtn}
-            onClick={() => onDelete(camera?.id)}
-            title="Remove"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+            </div>
+            <div className={styles.camMeta}>
+              <h3 className={styles.camName}>{camera?.name || "Unnamed Camera"}</h3>
+              <p className={styles.camPath}>
+                {camera?.stream_path || camera?.streamPath || "No path specified"}
+              </p>
+            </div>
+          </div>
+
+          <div className={styles.headerActions}>
+            <button
+              className={`${styles.individualPauseBtn} ${
+                isIndividuallyPaused || isPaused ? styles.individualPaused : styles.individualActive
+              }`}
+              onClick={handleIndividualPauseToggle}
+              disabled={startStopLoading || isPaused}
+              title={
+                isPaused
+                  ? "Global monitoring is paused"
+                  : isIndividuallyPaused
+                    ? "Resume this camera"
+                    : "Pause this camera"
+              }
             >
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14H6L5 6" />
-              <path d="M10 11v6M14 11v6M9 6V4h6v2" />
-            </svg>
-          </button>
+              {startStopLoading ? (
+                <span className={styles.spinner} />
+              ) : isIndividuallyPaused || isPaused ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              )}
+            </button>
+
+            <button className={styles.delBtn} onClick={() => onDelete(camera?.id)} title="Remove">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6M9 6V4h6v2" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        {/* Live Camera Stream */}
         <div className={styles.streamWrap}>
           <div className={styles.streamControls}>
-            <button
-              type="button"
-              className={styles.streamToggle}
-              onClick={() => setShowOverlay((prev) => !prev)}
-            >
+            <button type="button" className={styles.streamToggle} onClick={() => setShowOverlay((prev) => !prev)}>
               {showOverlay ? "Show Raw Feed" : "Show Algorithm Overlay"}
             </button>
             <button
@@ -188,6 +146,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
               Magnify
             </button>
           </div>
+
           <button
             type="button"
             className={styles.streamPreview}
@@ -200,30 +159,20 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
               onError={() => setStreamError(true)}
               onLoad={() => setStreamError(false)}
             />
-            {streamError && (
-              <span className={styles.streamError}>Stream unavailable</span>
-            )}
+            {streamError && <span className={styles.streamError}>Stream unavailable</span>}
           </button>
+
           <p className={styles.streamLegend}>
             {showOverlay
-              ? "Overlay: green boxes + tracker IDs. Rule: left->right = IN, right->left = OUT."
+              ? "Overlay: green boxes with tracker IDs. Rule: left-to-right = IN, right-to-left = OUT."
               : "Raw live feed without algorithm annotations."}
           </p>
         </div>
 
-        {/* Count */}
         <div className={styles.countRow}>
           {isPaused || isIndividuallyPaused ? (
             <div className={styles.paused}>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1"
-                style={{ color: "#f97316", marginRight: "4px" }}
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="4" width="4" height="16" />
                 <rect x="14" y="4" width="4" height="16" />
               </svg>
@@ -234,17 +183,14 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
               <div className={styles.countSummary}>
                 <div className={styles.countMetric}>
                   <span className={styles.countLabel}>IN</span>
-                  <span className={styles.countValueIn}>
-                    {inCount.toLocaleString()}
-                  </span>
+                  <span className={styles.countValueIn}>{inCount.toLocaleString()}</span>
                 </div>
                 <div className={styles.countMetric}>
                   <span className={styles.countLabel}>OUT</span>
-                  <span className={styles.countValueOut}>
-                    {outCount.toLocaleString()}
-                  </span>
+                  <span className={styles.countValueOut}>{outCount.toLocaleString()}</span>
                 </div>
               </div>
+
               <div className={styles.countControls}>
                 {alertLevel && (
                   <div
@@ -255,37 +201,24 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
                       borderColor: `${alertLevel.color}44`,
                     }}
                   >
-                    {alertLevel.level === "CRITICAL" && (
-                      <span
-                        className={styles.blinkDot}
-                        style={{ background: alertLevel.color }}
-                      />
-                    )}
+                    {alertLevel.level === "CRITICAL" && <span className={styles.blinkDot} />}
                     {alertLevel.label}
                   </div>
                 )}
+
                 <button
                   className={styles.resetBtn}
                   onClick={handleResetCount}
                   disabled={resetLoading}
-                  title="Reset count to 0"
+                  title="Reset camera count"
                 >
                   {resetLoading ? (
                     <span className={styles.resetSpinner} />
                   ) : (
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21.5 2v6h-6M2.5 22v-6h6" />
-                      <path d="M2 11.5a10 10 0 0 1 18.8-4.3" />
-                      <path d="M22 12.5a10 10 0 0 1-18.8 4.2" />
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="23 4 23 10 17 10" />
+                      <polyline points="1 20 1 14 7 14" />
+                      <path d="M3.5 9a9 9 0 0 1 14.8-3.3L23 10M1 14l4.7 4.3A9 9 0 0 0 20.5 15" />
                     </svg>
                   )}
                 </button>
@@ -293,17 +226,16 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
             </>
           ) : (
             <div className={styles.pending}>
-              <div className={styles.spinner} />
-              Awaiting data…
+              <span className={styles.spinner} />
+              Waiting for data…
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div className={styles.footer}>
+          <span>Current total: {count ?? "..."}</span>
+          <span className={styles.dot}>•</span>
           <span>Last update: {fmtTime(timestamp)}</span>
-          <span className={styles.dot}>·</span>
-          <span>Counts refresh every ~1s</span>
         </div>
       </div>
 
@@ -311,16 +243,14 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
         <div className={styles.modalOverlay} onClick={() => setIsZoomOpen(false)}>
           <div className={styles.modalBody} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h4>{camera?.name || "Camera"} Live View</h4>
+              <h4>{camera?.name || "Camera"} Live Feed</h4>
               <button onClick={() => setIsZoomOpen(false)}>Close</button>
             </div>
             <div className={styles.modalStream}>
               <img src={streamUrl} alt={`${camera?.name || "Camera"} magnified stream`} />
             </div>
             <p className={styles.modalHint}>
-              {showOverlay
-                ? "Algorithm overlay is enabled: ID boxes, vertical counting line, IN/OUT logic."
-                : "Raw feed view is enabled."}
+              {showOverlay ? "Algorithm overlay active in zoom view." : "Raw live feed in zoom view."}
             </p>
           </div>
         </div>

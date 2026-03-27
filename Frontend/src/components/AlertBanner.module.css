@@ -2,31 +2,111 @@
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding: 0.85rem 1.25rem;
+  padding: 1rem 1.2rem;
   border: 1px solid;
-  border-radius: 10px;
+  border-radius: 22px;
   margin-bottom: 1.5rem;
+  backdrop-filter: blur(14px);
   animation: slideDown 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.12) 50%, transparent 78%);
+  transform: translateX(-120%);
+  animation: alertSweep 6s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes slideDown {
-  from { transform: translateY(-8px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .level {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .message {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 0.9rem;
-  color: #94a3b8;
+  font-size: 0.96rem;
+  color: var(--text);
+  line-height: 1.6;
 }
 
-.message strong { color: #e2e8f0; }
+.critical {
+  animation: slideDown 0.3s ease, criticalPulse 1.4s ease-in-out infinite;
+}
+
+.danger {
+  animation: slideDown 0.3s ease, dangerPulse 2s ease-in-out infinite;
+}
+
+.warning {
+  animation: slideDown 0.3s ease, warningPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes alertSweep {
+  0%,
+  100% {
+    transform: translateX(-120%);
+  }
+  40%,
+  60% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes criticalPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 95, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(255, 107, 95, 0);
+  }
+}
+
+@keyframes dangerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 95, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 107, 95, 0);
+  }
+}
+
+@keyframes warningPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 184, 77, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 184, 77, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner,
+  .banner::after,
+  .critical,
+  .danger,
+  .warning {
+    animation: none !important;
+  }
+}

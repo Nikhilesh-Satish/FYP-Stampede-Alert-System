@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
@@ -48,23 +54,33 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/about" element={<About />} />
-          <Route path="/features" element={<Feature />} />
-        </Routes>
+        <AnimatedRoutes />
       </AuthProvider>
     </BrowserRouter>
   );
 }
+
+const AnimatedRoutes = () => {
+  const location = useLocation();
+
+  return (
+    <div className="routeStage" key={location.pathname}>
+      <Routes location={location}>
+        <Route path="/" element={<HomeRedirect />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/about" element={<About />} />
+        <Route path="/features" element={<Feature />} />
+      </Routes>
+    </div>
+  );
+};
 
 export default App;

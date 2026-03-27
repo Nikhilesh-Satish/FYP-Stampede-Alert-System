@@ -1,26 +1,216 @@
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
-*, *::before, *::after {
+:root {
+  color-scheme: dark;
+  --bg: #07111f;
+  --bg-elevated: rgba(12, 22, 39, 0.84);
+  --bg-soft: rgba(17, 31, 54, 0.72);
+  --surface: rgba(12, 24, 40, 0.72);
+  --surface-strong: rgba(17, 32, 53, 0.9);
+  --surface-hover: rgba(22, 39, 64, 0.96);
+  --line: rgba(150, 193, 255, 0.14);
+  --line-strong: rgba(126, 222, 214, 0.28);
+  --text: #edf4ff;
+  --muted: #97a8c3;
+  --soft: #667894;
+  --accent: #65f2d7;
+  --accent-strong: #2fd8ff;
+  --alert: #ff6b5f;
+  --warn: #ffb84d;
+  --good: #4ade80;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  --radius-xl: 32px;
+  --radius-lg: 24px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: #0f1923;
+  background:
+    radial-gradient(circle at top left, rgba(47, 216, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 80% 10%, rgba(255, 107, 95, 0.1), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(101, 242, 215, 0.08), transparent 30%),
+    linear-gradient(180deg, #07111f 0%, #081524 40%, #060c18 100%);
 }
 
 body {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #e2e8f0;
+  overflow-x: hidden;
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0f1923; }
-::-webkit-scrollbar-thumb { background: #1e2a3a; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #2a3a50; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(125, 170, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 170, 255, 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black 35%, transparent 88%);
+  opacity: 0.35;
+  animation: gridDrift 24s linear infinite;
+}
 
-@keyframes spin { to { transform: rotate(360deg); } }
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px),
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px),
+    radial-gradient(circle at 60% 75%, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px);
+  background-size: 180px 180px, 220px 220px, 260px 260px;
+  opacity: 0.55;
+  animation: shimmerField 18s linear infinite;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.routeStage {
+  animation: routeFade 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.interactiveGlow {
+  position: relative;
+  overflow: hidden;
+  transform:
+    perspective(1200px)
+    rotateX(var(--rotate-x, 0deg))
+    rotateY(var(--rotate-y, 0deg));
+  transition: transform 0.18s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  will-change: transform;
+}
+
+.interactiveGlow::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(
+    280px circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    rgba(101, 242, 215, 0.16),
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+
+.interactiveGlow:hover::before {
+  opacity: 1;
+}
+
+.magneticButton {
+  transition: transform 0.18s ease, box-shadow 0.22s ease;
+  will-change: transform;
+}
+
+::selection {
+  background: rgba(101, 242, 215, 0.28);
+  color: var(--text);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(5, 12, 22, 0.9);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(101, 242, 215, 0.55), rgba(47, 216, 255, 0.35));
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(101, 242, 215, 0.72), rgba(47, 216, 255, 0.5));
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes gridDrift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(72px);
+  }
+}
+
+@keyframes shimmerField {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate3d(12px, -10px, 0);
+  }
+}
+
+@keyframes routeFade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after,
+  .routeStage {
+    animation: none !important;
+  }
+
+  .interactiveGlow {
+    transform: none !important;
+  }
+}

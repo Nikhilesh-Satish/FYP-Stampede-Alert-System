@@ -2,11 +2,14 @@ import { useState } from "react";
 import {
   LineChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceArea,
+  ReferenceLine,
 } from "recharts";
 import styles from "./TrendChart.module.css";
 
@@ -45,7 +48,20 @@ const GlobalTrendChart = ({ data = [], capacity }) => {
           data={displayData}
           margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
         >
+          <defs>
+            <linearGradient id="globalTrendFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#65f2d7" stopOpacity={0.34} />
+              <stop offset="100%" stopColor="#65f2d7" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+          {capacity ? (
+            <ReferenceArea
+              y1={capacity * 0.8}
+              y2={capacity}
+              fill="rgba(255,184,77,0.08)"
+            />
+          ) : null}
           <XAxis dataKey="time" stroke="#94a3b8" style={{ fontSize: "12px" }} />
           <YAxis
             stroke="#94a3b8"
@@ -61,25 +77,30 @@ const GlobalTrendChart = ({ data = [], capacity }) => {
             }}
             formatter={(value) => [value, "People Count"]}
           />
+          <Area
+            type="monotone"
+            dataKey="count"
+            stroke="none"
+            fill="url(#globalTrendFill)"
+            animationDuration={650}
+          />
           <Line
             type="monotone"
             dataKey="count"
             stroke="#00e5cc"
-            strokeWidth={2}
+            strokeWidth={3}
             dot={{ fill: "#00e5cc", r: 4 }}
-            activeDot={{ r: 6 }}
-            animationDuration={300}
+            activeDot={{ r: 7, fill: "#ffffff", stroke: "#00e5cc", strokeWidth: 2 }}
+            animationDuration={650}
           />
           {capacity && (
-            <Line
-              type="monotone"
-              dataKey={() => capacity}
+            <ReferenceLine
+              y={capacity}
               stroke="rgba(239, 68, 68, 0.5)"
               strokeWidth={1}
               strokeDasharray="5 5"
-              dot={false}
-              animationDuration={0}
               name="Capacity"
+              ifOverflow="extendDomain"
             />
           )}
         </LineChart>

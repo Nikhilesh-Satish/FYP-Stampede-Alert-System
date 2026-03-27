@@ -61,13 +61,18 @@ export const useCameraMonitor = (
       // Collect individual counts
       countData.forEach(({ camera_id, count, in_count, out_count, timestamp }) => {
         if (count === null || count === undefined) return;
+
+        const safeCount = Number.isFinite(Number(count)) ? Number(count) : 0;
+        const cameraAlertLevel = getAlertLevel(Math.max(0, safeCount), capacity);
+
         newCounts[camera_id] = {
-          count,
+          count: safeCount,
           inCount: in_count ?? 0,
           outCount: out_count ?? 0,
           timestamp,
+          alertLevel: cameraAlertLevel,
         };
-        totalCount += count;
+        totalCount += safeCount;
 
         // Add data point to camera history (only if not paused)
         if (!isPaused) {
@@ -144,19 +149,22 @@ export const useCameraMonitor = (
   }, [fetchCounts]);
 
   useEffect(() => {
-    // If paused, don't fetch or set up interval
-    if (isPaused) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      return;
-    }
-
-    // Initial fetch and start interval when not paused
-    fetchCounts();
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
+
+    // Even in paused mode, fetch once so the dashboard shows the latest
+    // aggregate count instead of staying empty until polling is resumed.
+    fetchCounts();
+
+    if (isPaused) {
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    }
+
     intervalRef.current = setInterval(() => {
       fetchCounts();
     }, POLL_INTERVAL_MS);

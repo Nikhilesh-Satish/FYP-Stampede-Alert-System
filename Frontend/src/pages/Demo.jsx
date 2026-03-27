@@ -1,58 +1,59 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import Navbar from "../components/Navbar";
 import styles from "./Demo.module.css";
 
 const Demo = () => {
   return (
-    <center>
-      <form className={styles.demoForm}>
-        <h2>
-          Fill the form below in case of any queries! Our team will be happy to
-          reach out to you and help you out!
-        </h2>
+    <form className={styles.demoForm}>
+      <div className={styles.formHeader}>
+        <span className={styles.kicker}>Direct line</span>
+        <h2 className={styles.title}>Tell us about your venue or event</h2>
+        <p className={styles.subtitle}>
+          Fill in the details below and the team can follow up on deployment,
+          operations, or research queries.
+        </p>
+      </div>
 
+      <div className={styles.formGrid}>
         <input
           className={styles.inputField}
           type="text"
           id="fname"
           name="fname"
-          placeholder="Enter your name"
-        ></input>
+          placeholder="Your name"
+        />
 
         <input
           className={styles.inputField}
           type="text"
           id="orgname"
           name="orgname"
-          placeholder="Enter your organisation name"
-        ></input>
+          placeholder="Organisation"
+        />
 
         <input
           className={styles.inputField}
           type="email"
           id="email"
           name="email"
-          placeholder="Enter your email"
-        ></input>
+          placeholder="Email address"
+        />
         <input
           className={styles.inputField}
           id="contact"
           name="contact"
-          placeholder="Enter your contact number"
-        ></input>
-        <textarea
-          className={styles.inputField}
-          id="message"
-          name="message"
-          placeholder="Enter your query"
-        ></textarea>
-        <button className={styles.submitButton} type="submit">
-          Submit
-        </button>
-      </form>
-    </center>
+          placeholder="Contact number"
+        />
+      </div>
+
+      <textarea
+        className={`${styles.inputField} ${styles.textarea}`}
+        id="message"
+        name="message"
+        placeholder="Describe your query, venue scale, and expected crowd conditions"
+      />
+      <button className={styles.submitButton} type="submit">
+        Send Enquiry
+      </button>
+    </form>
   );
 };
 

@@ -1,143 +1,97 @@
 .predictionCard {
-  background: linear-gradient(
-    135deg,
-    rgba(15, 23, 42, 0.8) 0%,
-    rgba(30, 41, 59, 0.8) 100%
-  );
-  border: 1px solid rgba(0, 229, 204, 0.2);
-  border-radius: 12px;
-  padding: 24px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
-}
-
-.predictionCard:hover {
-  border-color: rgba(0, 229, 204, 0.4);
-  box-shadow: 0 12px 40px rgba(0, 229, 204, 0.1);
+  padding: 1.4rem;
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 22%),
+    linear-gradient(180deg, rgba(15, 28, 46, 0.84), rgba(8, 16, 31, 0.98));
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
 }
 
 .title {
-  color: #e2e8f0;
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 20px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 1.15rem;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.5rem;
 }
 
 .emptyState {
-  color: #94a3b8;
+  color: var(--muted);
   text-align: center;
-  padding: 40px 20px;
-  font-size: 14px;
+  padding: 2.5rem 1rem;
 }
 
 .riskIndicator {
-  border: 2px solid;
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 24px;
-  background: rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-}
-
-.riskIndicator:hover {
-  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid;
+  border-radius: 22px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.2rem;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .riskLevel {
-  font-size: 14px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 6px;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.35rem;
 }
 
 .riskMessage {
-  color: #cbd5e1;
-  font-size: 13px;
-  line-height: 1.5;
+  color: var(--text);
+  line-height: 1.6;
 }
 
 .metricsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .metricBox {
-  background: rgba(0, 229, 204, 0.05);
-  border: 1px solid rgba(0, 229, 204, 0.15);
-  border-radius: 8px;
-  padding: 16px;
-  text-align: center;
-  transition: all 0.2s ease;
-}
-
-.metricBox:hover {
-  background: rgba(0, 229, 204, 0.1);
-  border-color: rgba(0, 229, 204, 0.3);
+  padding: 1rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .metricLabel {
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 600;
+  color: var(--soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.5rem;
 }
 
 .metricValue {
-  color: #00e5cc;
-  font-size: 24px;
+  color: var(--accent);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 2rem;
   font-weight: 700;
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 0.3rem;
 }
 
-.metricSubtext {
-  color: #64748b;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
+.metricSubtext,
 .metricCapacity {
-  color: #64748b;
-  font-size: 11px;
-  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .disclaimer {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 12px;
-  text-align: center;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(47, 216, 255, 0.08);
+  border: 1px solid rgba(47, 216, 255, 0.14);
+  color: #b3e7ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-}
-
-@media (max-width: 768px) {
-  .predictionCard {
-    padding: 16px;
-  }
-
-  .metricsGrid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
-  .metricValue {
-    font-size: 20px;
-  }
-
-  .title {
-    font-size: 16px;
-  }
+  gap: 0.5rem;
+  text-align: center;
 }

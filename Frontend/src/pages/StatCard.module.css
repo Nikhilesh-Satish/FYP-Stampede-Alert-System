@@ -1,37 +1,43 @@
 .statCard {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: #1a2535;
-  margin-left: 3rem;
-  margin-right: 3rem;
-  padding-top: 1rem;
+  grid-template-columns: minmax(240px, 0.95fr) minmax(0, 1.05fr);
+  gap: 1.4rem;
+  align-items: center;
+  padding: 1.6rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(16, 29, 48, 0.86), rgba(8, 16, 31, 0.96));
+  box-shadow: var(--shadow);
 }
 
 .statImg {
-  height: 90%;
-  margin-left: 1rem;
-  margin-top: 1rem;
-  width: auto;
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .statDesc {
-  font-size: 1.4rem;
+  margin: 0;
   font-family: "Rajdhani", sans-serif;
-  font-weight: 700;
-  color: #e2e8f0;
-  margin-top: 6rem;
-  margin-right: 1rem;
+  font-size: clamp(1.15rem, 2.5vw, 1.8rem);
+  line-height: 1.28;
+  color: var(--text);
 }
 
 .statHeading {
-  font-size: 1.75rem;
+  margin: 0;
   font-family: "Rajdhani", sans-serif;
-  font-weight: 700;
-  color: #00e5cc;
-  background: #1a2535;
-  margin-bottom: 0;
-  margin-top: 2rem;
-  margin-left: 3rem;
-  margin-right: 3rem;
-  padding-top: 2rem;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 0.94;
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .statCard {
+    grid-template-columns: 1fr;
+  }
 }

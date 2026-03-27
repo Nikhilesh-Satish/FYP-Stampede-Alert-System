@@ -1,33 +1,45 @@
 .aboutCard {
-  width: 70%;
-  height: auto;
-  margin: 0 auto;
-  background-color: #071934;
-  margin-bottom: 2rem;
-}
-
-.aboutName {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.6rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(16, 29, 48, 0.88), rgba(8, 16, 31, 0.96));
+  box-shadow: var(--shadow);
 }
 
 .aboutPhoto {
-  display: block;
-  margin: 0 auto;
-  border-radius: 50%;
-  height: 10%;
-  width: 10%;
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.aboutName {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 .aboutDesc {
-  text-align: center;
-  font-size: 1.1rem;
-  color: #dfe5ec;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
 }
 
 .linkedinIcon {
-  display: block;
-  margin: 0 auto;
-  width: 2.5%;
-  height: auto;
-  padding-bottom: 1rem;
+  width: 28px;
+  height: 28px;
+  color: #7dd3fc;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.linkedinIcon:hover {
+  transform: translateY(-2px);
+  color: var(--accent);
 }
