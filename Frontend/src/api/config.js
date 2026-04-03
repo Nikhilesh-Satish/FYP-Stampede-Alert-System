@@ -63,3 +63,41 @@ export const getAlertLevel = (count, capacity) => {
     return { ...CAPACITY_THRESHOLDS.DANGER, level: "DANGER" };
   return { ...CAPACITY_THRESHOLDS.CRITICAL, level: "CRITICAL" };
 };
+
+export const DENSITY_THRESHOLDS = {
+  SAFE: {
+    maxScore: 2.0,
+    label: "Safe",
+    color: "#22c55e",
+    bg: "rgba(34,197,94,0.12)",
+  },
+  WARNING: {
+    maxScore: 3.5,
+    label: "Warning",
+    color: "#f59e0b",
+    bg: "rgba(245,158,11,0.12)",
+  },
+  DANGER: {
+    maxScore: 5.0,
+    label: "Danger",
+    color: "#ef4444",
+    bg: "rgba(239,68,68,0.12)",
+  },
+  CRITICAL: {
+    maxScore: Number.POSITIVE_INFINITY,
+    label: "Critical",
+    color: "#dc2626",
+    bg: "rgba(220,38,38,0.2)",
+  },
+};
+
+export const getDensityAlertLevel = (densityScore) => {
+  const score = Number.isFinite(Number(densityScore)) ? Number(densityScore) : 0;
+  if (score <= DENSITY_THRESHOLDS.SAFE.maxScore)
+    return { ...DENSITY_THRESHOLDS.SAFE, level: "SAFE" };
+  if (score <= DENSITY_THRESHOLDS.WARNING.maxScore)
+    return { ...DENSITY_THRESHOLDS.WARNING, level: "WARNING" };
+  if (score <= DENSITY_THRESHOLDS.DANGER.maxScore)
+    return { ...DENSITY_THRESHOLDS.DANGER, level: "DANGER" };
+  return { ...DENSITY_THRESHOLDS.CRITICAL, level: "CRITICAL" };
+};

@@ -8,8 +8,10 @@ import CameraCard from "../components/CameraCard";
 import AddCameraModal from "../components/AddCameraModal";
 import AlertBanner from "../components/AlertBanner";
 import GlobalTrendChart from "../components/GlobalTrendChart";
+import GlobalDensityChart from "../components/GlobalDensityChart";
 import CameraTrendChart from "../components/CameraTrendChart";
 import PredictionCard from "../components/PredictionCard";
+import InfoButton from "../components/InfoButton";
 import styles from "./DashboardPage.module.css";
 import Reveal from "../components/Reveal";
 import { usePointerGlow } from "../hooks/usePointerGlow";
@@ -30,6 +32,9 @@ const StatCard = ({ label, value, color, icon, children }) => (
   </div>
 );
 
+const DENSITY_INFO_TEXT =
+  "This is an estimate, not an exact physical measurement. Each camera view is split into three horizontal zones. For ground cameras, people farther away are weighted a bit more so distance does not unfairly reduce the result. That weighted crowd size is then compared with the monitored area you entered.";
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const [cameras, setCameras] = useState([]);
@@ -48,6 +53,8 @@ const DashboardPage = () => {
     forceRefresh,
     globalHistory,
     cameraHistory,
+    densitySummary,
+    globalDensityHistory,
   } = useCameraMonitor(cameras, capacity, isPaused);
 
   useEffect(() => {
@@ -96,6 +103,7 @@ const DashboardPage = () => {
   const totalPeople = globalAlert?.totalCount ?? 0;
   const occupancyPercent = globalAlert?.occupancyPercent ?? 0;
   const alertLevel = globalAlert?.alertLevel;
+  const densityAlertLevel = densitySummary?.alertLevel;
   const heroGlow = usePointerGlow();
   const addMagnetic = useMagneticHover();
 
@@ -297,15 +305,20 @@ const DashboardPage = () => {
 
           <Reveal delay={210}>
             <StatCard
-              label="Alert Status"
-              value={alertLevel?.label || "Safe"}
-              color={alertLevel?.color || "#4ade80"}
+              label="Stampede Risk"
+              value={densityAlertLevel?.label || "Safe"}
+              color={densityAlertLevel?.color || "#4ade80"}
               icon={
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M10.3 21h3.4M12 3a7 7 0 0 1 7 7c0 2.5 1 4 1 6H4c0-2 1-3.5 1-6a7 7 0 0 1 7-7z" />
                 </svg>
               }
-            />
+            >
+              <InfoButton
+                text={DENSITY_INFO_TEXT}
+                label="Crowd density methodology"
+              />
+            </StatCard>
           </Reveal>
         </div>
 
@@ -356,6 +369,9 @@ const DashboardPage = () => {
             </Reveal>
             <Reveal delay={70}>
               <GlobalTrendChart data={globalHistory} capacity={capacity} />
+            </Reveal>
+            <Reveal delay={140}>
+              <GlobalDensityChart data={globalDensityHistory} />
             </Reveal>
 
             {cameraHistory && Object.keys(cameraHistory).length > 0 && (

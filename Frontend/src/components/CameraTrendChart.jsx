@@ -10,6 +10,7 @@ import {
   ReferenceArea,
 } from "recharts";
 import styles from "./TrendChart.module.css";
+import { getNiceAxisConfig } from "./chartScale";
 
 const CameraTrendChart = ({ cameraId, cameraName, data = [], capacity }) => {
   if (!data || data.length === 0) {
@@ -25,6 +26,7 @@ const CameraTrendChart = ({ cameraId, cameraName, data = [], capacity }) => {
 
   // Show last 10 data points for individual camera
   const displayData = data.slice(-10);
+  const axisConfig = getNiceAxisConfig(displayData.map((point) => point.count));
 
   return (
     <div className={styles.chartContainer}>
@@ -53,7 +55,8 @@ const CameraTrendChart = ({ cameraId, cameraName, data = [], capacity }) => {
           <YAxis
             stroke="#94a3b8"
             style={{ fontSize: "11px" }}
-            domain={[0, capacity]}
+            domain={axisConfig.domain}
+            ticks={axisConfig.ticks}
           />
           <Tooltip
             contentStyle={{

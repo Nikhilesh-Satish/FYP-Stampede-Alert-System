@@ -3,9 +3,9 @@ tracker_type: bytetrack
 # Crowd-tuned settings:
 # - lower thresholds keep short/partially-occluded tracks alive
 # - longer buffer improves continuity through occlusion
-track_high_thresh: 0.2
-track_low_thresh: 0.05
-new_track_thresh: 0.2
-track_buffer: 120
-match_thresh: 0.92
+track_high_thresh: 0.15
+track_low_thresh: 0.03
+new_track_thresh: 0.15
+track_buffer: 160
+match_thresh: 0.85
 fuse_score: true

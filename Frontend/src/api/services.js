@@ -81,14 +81,34 @@ export const cameraApi = {
 
   /**
    * POST /cameras/add
-   * Body: { name, stream_path }
-   * Returns: created camera object { id, name, stream_path }
+   * Body: { name, stream_path, count_axis, in_direction, shot_type, processing_preset, counting_enabled, density_enabled, monitored_area_sqm }
+   * Returns: created camera object with processing/counting/density settings
    */
-  addCamera: async ({ name, streamPath }) => {
+  addCamera: async ({
+    name,
+    streamPath,
+    countAxis,
+    inDirection,
+    shotType,
+    processingPreset,
+    countingEnabled,
+    densityEnabled,
+    monitoredAreaSqm,
+  }) => {
     const res = await fetch(`${API_BASE_URL}${ENDPOINTS.ADD_CAMERA}`, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ name, stream_path: streamPath }),
+      body: JSON.stringify({
+        name,
+        stream_path: streamPath,
+        count_axis: countAxis || "x",
+        in_direction: inDirection || "positive",
+        shot_type: shotType || "ground",
+        processing_preset: processingPreset || "balanced",
+        counting_enabled: countingEnabled ?? true,
+        density_enabled: densityEnabled ?? false,
+        monitored_area_sqm: densityEnabled ? monitoredAreaSqm : null,
+      }),
     });
     return handleResponse(res);
   },

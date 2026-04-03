@@ -3,6 +3,10 @@ import { createPortal } from "react-dom";
 import { cameraApi } from "../api/services";
 import styles from "./CameraCard.module.css";
 import { usePointerGlow } from "../hooks/usePointerGlow";
+import InfoButton from "./InfoButton";
+
+const DENSITY_INFO_TEXT =
+  "This is an estimate, not an exact physical measurement. We divide the camera view into three horizontal zones, give more importance to people farther away in ground-camera views, and then compare that weighted crowd size against the monitored area you entered.";
 
 const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const glow = usePointerGlow();
@@ -17,10 +21,45 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const inCount = countData?.inCount ?? 0;
   const outCount = countData?.outCount ?? 0;
   const alertLevel = countData?.alertLevel;
+  const countingEnabled = countData?.countingEnabled ?? camera?.counting_enabled ?? true;
+  const densityEnabled = countData?.densityEnabled ?? camera?.density_enabled ?? false;
+  const weightedPeople = countData?.weightedPeople ?? 0;
+  const smoothedDensityScore = countData?.smoothedDensityScore ?? 0;
+  const densityAlertLevel = countData?.densityAlertLevel;
+  const monitoredAreaSqm = countData?.monitoredAreaSqm ?? camera?.monitored_area_sqm ?? null;
   const timestamp = countData?.timestamp;
   const streamUrl = cameraApi.getCameraStreamUrl(camera?.id, {
     overlay: showOverlay,
   });
+  const directionHint = (() => {
+    const axis = camera?.count_axis || "x";
+    const inDirection = camera?.in_direction || "positive";
+    if (axis === "y") {
+      return inDirection === "positive"
+        ? "top-to-bottom = IN, bottom-to-top = OUT"
+        : "bottom-to-top = IN, top-to-bottom = OUT";
+    }
+    return inDirection === "positive"
+      ? "left-to-right = IN, right-to-left = OUT"
+      : "right-to-left = IN, left-to-right = OUT";
+  })();
+  const shotTypeLabel = camera?.shot_type === "drone" ? "Drone / overhead mode" : "Ground / normal mode";
+  const processingPresetLabel = (() => {
+    switch (camera?.processing_preset) {
+      case "fast":
+        return "Fast preset";
+      case "accurate":
+        return "Accurate preset";
+      default:
+        return "Balanced preset";
+    }
+  })();
+  const highestAlert = (() => {
+    const severity = { SAFE: 0, WARNING: 1, DANGER: 2, CRITICAL: 3 };
+    const countSeverity = severity[alertLevel?.level] ?? 0;
+    const densitySeverity = severity[densityAlertLevel?.level] ?? 0;
+    return densitySeverity > countSeverity ? densityAlertLevel : alertLevel;
+  })();
 
   const fmtTime = (ts) => {
     if (!ts) return "Pending first update…";
@@ -97,10 +136,10 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
         {...glow.glowProps}
         className={styles.card}
         style={{
-          borderColor: alertLevel ? `${alertLevel.color}40` : "var(--line)",
+          borderColor: highestAlert ? `${highestAlert.color}40` : "var(--line)",
           background:
-            alertLevel?.level !== "SAFE" && alertLevel
-              ? `linear-gradient(180deg, ${alertLevel.bg}, rgba(8,16,31,0.98))`
+            highestAlert?.level !== "SAFE" && highestAlert
+              ? `linear-gradient(180deg, ${highestAlert.bg}, rgba(8,16,31,0.98))`
               : undefined,
         }}
       >
@@ -174,6 +213,13 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
             className={styles.streamPreview}
             onClick={openZoom}
             disabled={streamError}
+            style={{
+              borderColor: highestAlert ? `${highestAlert.color}44` : undefined,
+              boxShadow:
+                highestAlert && highestAlert.level !== "SAFE"
+                  ? `0 0 0 1px ${highestAlert.color}22, 0 18px 38px ${highestAlert.color}18`
+                  : undefined,
+            }}
           >
             <img
               src={streamUrl}
@@ -186,7 +232,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
 
           <p className={styles.streamLegend}>
             {showOverlay
-              ? "Overlay: green boxes with tracker IDs. Rule: left-to-right = IN, right-to-left = OUT."
+              ? `Overlay: green boxes with tracker IDs. ${shotTypeLabel}. ${processingPresetLabel}. Rule: ${directionHint}.`
               : "Raw live feed without algorithm annotations."}
           </p>
         </div>
@@ -202,19 +248,38 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
             </div>
           ) : count !== null ? (
             <>
-              <div className={styles.countSummary}>
-                <div className={styles.countMetric}>
-                  <span className={styles.countLabel}>IN</span>
-                  <span className={styles.countValueIn}>{inCount.toLocaleString()}</span>
+              {countingEnabled ? (
+                <div className={styles.countSummary}>
+                  <div className={styles.countMetric}>
+                    <span className={styles.countLabel}>IN</span>
+                    <span className={styles.countValueIn}>{inCount.toLocaleString()}</span>
+                  </div>
+                  <div className={styles.countMetric}>
+                    <span className={styles.countLabel}>OUT</span>
+                    <span className={styles.countValueOut}>{outCount.toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className={styles.countMetric}>
-                  <span className={styles.countLabel}>OUT</span>
-                  <span className={styles.countValueOut}>{outCount.toLocaleString()}</span>
+              ) : densityEnabled ? (
+                <div className={styles.countSummary}>
+                  <div className={styles.countMetric}>
+                    <span className={styles.countLabel}>
+                      Approx. Density
+                      <InfoButton
+                        text={DENSITY_INFO_TEXT}
+                        label="Crowd density methodology"
+                      />
+                    </span>
+                    <span className={styles.countValueIn}>{smoothedDensityScore.toFixed(2)}</span>
+                  </div>
+                  <div className={styles.countMetric}>
+                    <span className={styles.countLabel}>Weighted People</span>
+                    <span className={styles.countValueOut}>{weightedPeople.toFixed(1)}</span>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className={styles.countControls}>
-                {alertLevel && (
+                {countingEnabled && alertLevel && (
                   <div
                     className={styles.badge}
                     style={{
@@ -227,23 +292,38 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
                     {alertLevel.label}
                   </div>
                 )}
+                {densityEnabled && densityAlertLevel && (
+                  <div
+                    className={styles.badge}
+                    style={{
+                      background: densityAlertLevel.bg,
+                      color: densityAlertLevel.color,
+                      borderColor: `${densityAlertLevel.color}44`,
+                    }}
+                  >
+                    {densityAlertLevel.level === "CRITICAL" && <span className={styles.blinkDot} />}
+                    Density {densityAlertLevel.label}
+                  </div>
+                )}
 
-                <button
-                  className={styles.resetBtn}
-                  onClick={handleResetCount}
-                  disabled={resetLoading}
-                  title="Reset camera count"
-                >
-                  {resetLoading ? (
-                    <span className={styles.resetSpinner} />
-                  ) : (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="23 4 23 10 17 10" />
-                      <polyline points="1 20 1 14 7 14" />
-                      <path d="M3.5 9a9 9 0 0 1 14.8-3.3L23 10M1 14l4.7 4.3A9 9 0 0 0 20.5 15" />
-                    </svg>
-                  )}
-                </button>
+                {countingEnabled && (
+                  <button
+                    className={styles.resetBtn}
+                    onClick={handleResetCount}
+                    disabled={resetLoading}
+                    title="Reset camera count"
+                  >
+                    {resetLoading ? (
+                      <span className={styles.resetSpinner} />
+                    ) : (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="23 4 23 10 17 10" />
+                        <polyline points="1 20 1 14 7 14" />
+                        <path d="M3.5 9a9 9 0 0 1 14.8-3.3L23 10M1 14l4.7 4.3A9 9 0 0 0 20.5 15" />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -255,10 +335,42 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
         </div>
 
         <div className={styles.footer}>
-          <span>Current total: {count ?? "..."}</span>
+          <span>
+            {countingEnabled
+              ? `Current total: ${count ?? "..."}`
+              : `Current total: ${count ?? "..."}`}
+          </span>
           <span className={styles.dot}>•</span>
           <span>Last update: {fmtTime(timestamp)}</span>
         </div>
+
+        {densityEnabled && (
+          <div className={styles.densityPanel}>
+            <div className={styles.densityHeader}>
+              <span className={styles.densityTitle}>Approximate Crowd Density</span>
+              <InfoButton
+                text={DENSITY_INFO_TEXT}
+                label="Crowd density methodology"
+              />
+            </div>
+            <div className={styles.densityGrid}>
+              <div className={styles.densityItem}>
+                <span className={styles.densityLabel}>Density Score</span>
+                <strong className={styles.densityValue}>{smoothedDensityScore.toFixed(2)}</strong>
+              </div>
+              <div className={styles.densityItem}>
+                <span className={styles.densityLabel}>Weighted People</span>
+                <strong className={styles.densityValue}>{weightedPeople.toFixed(1)}</strong>
+              </div>
+              <div className={styles.densityItem}>
+                <span className={styles.densityLabel}>Area</span>
+                <strong className={styles.densityValue}>
+                  {monitoredAreaSqm ? `${monitoredAreaSqm} m²` : "Not set"}
+                </strong>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {isZoomOpen &&
@@ -271,7 +383,13 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
             aria-label={`${camera?.name || "Camera"} live feed`}
           >
             <div className={styles.modalBody} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
+              <div
+                className={styles.modalHeader}
+                style={{
+                  borderColor: highestAlert ? `${highestAlert.color}44` : undefined,
+                  background: highestAlert?.bg,
+                }}
+              >
                 <h4>{camera?.name || "Camera"} Live Feed</h4>
                 <button type="button" onClick={() => setIsZoomOpen(false)}>
                   Close

@@ -1,0 +1,52 @@
+.infoBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  padding: 0;
+  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.infoBtn:hover,
+.infoBtn:focus-visible {
+  color: var(--text);
+  border-color: rgba(101, 242, 215, 0.34);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.tooltip {
+  position: fixed;
+  width: min(320px, calc(100vw - 24px));
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 16, 31, 0.985);
+  color: var(--text);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+  z-index: 9999;
+}
+
+.tooltipTitle {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: #ffcc7a;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tooltipText {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text);
+}

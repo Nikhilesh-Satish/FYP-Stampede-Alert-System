@@ -10,7 +10,7 @@
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 20%),
     linear-gradient(180deg, rgba(16, 29, 48, 0.88), rgba(8, 16, 31, 0.98));
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow: visible;
   transition: transform 0.25s ease, border-color 0.25s ease;
 }
 
@@ -193,7 +193,9 @@
 }
 
 .countLabel {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   color: var(--soft);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.68rem;
@@ -249,6 +251,61 @@
   font-size: 0.72rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.densityPanel {
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.densityHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.densityTitle {
+  color: var(--text);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.densityGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.densityItem {
+  padding: 0.8rem 0.85rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.densityLabel {
+  display: block;
+  color: var(--soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.densityValue {
+  display: block;
+  margin-top: 0.2rem;
+  color: #ffcc7a;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 .blinkDot {

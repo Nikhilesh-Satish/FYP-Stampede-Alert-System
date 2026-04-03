@@ -8,6 +8,7 @@
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
+  overflow-y: auto;
   animation: fadeIn 0.2s ease;
 }
 
@@ -24,6 +25,9 @@
   width: 100%;
   max-width: 520px;
   padding: 1.8rem;
+  margin: auto;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
   border-radius: 30px;
   border: 1px solid var(--line);
   background:

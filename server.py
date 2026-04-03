@@ -41,12 +41,20 @@ camera_direction_totals = {}
 camera_count_updated_at = {}  # Last time each camera count changed (ms epoch)
 camera_running_status = {}  # Track which cameras are running
 camera_frames = {}  # Latest raw + overlay JPEG frame bytes per camera
+camera_density_stats = {}  # Latest crowd-density stats per camera
 lock = Lock()
 
 # Camera thread storage
 camera_threads = {}
 camera_workers = {}
 camera_stream_paths = {}
+camera_count_axes = {}
+camera_in_directions = {}
+camera_shot_types = {}
+camera_processing_presets = {}
+camera_counting_enabled = {}
+camera_density_enabled = {}
+camera_monitored_areas = {}
 
 
 @app.route("/cameras", methods=["GET"])
@@ -57,7 +65,14 @@ def get_cameras():
         cameras.append({
             "id": cam_id,
             "name": cam_id,
-            "stream_path": camera_stream_paths.get(cam_id, "active")
+            "stream_path": camera_stream_paths.get(cam_id, "active"),
+            "count_axis": camera_count_axes.get(cam_id, "x"),
+            "in_direction": camera_in_directions.get(cam_id, "positive"),
+            "shot_type": camera_shot_types.get(cam_id, "ground"),
+            "processing_preset": camera_processing_presets.get(cam_id, "balanced"),
+            "counting_enabled": camera_counting_enabled.get(cam_id, True),
+            "density_enabled": camera_density_enabled.get(cam_id, False),
+            "monitored_area_sqm": camera_monitored_areas.get(cam_id),
         })
     return jsonify(cameras)
 
@@ -67,9 +82,34 @@ def add_camera():
     data = request.json
     name = data.get("name")
     stream_path = data.get("stream_path")
+    count_axis = (data.get("count_axis") or "x").lower()
+    in_direction = (data.get("in_direction") or "positive").lower()
+    shot_type = (data.get("shot_type") or "ground").lower()
+    processing_preset = (data.get("processing_preset") or "balanced").lower()
+    counting_enabled = bool(data.get("counting_enabled", True))
+    density_enabled = bool(data.get("density_enabled", False))
+    monitored_area_sqm = data.get("monitored_area_sqm")
 
     if not name or not stream_path:
         return jsonify({"message": "Name and stream_path are required"}), 400
+
+    if count_axis not in {"x", "y"}:
+        return jsonify({"message": "count_axis must be 'x' or 'y'"}), 400
+    if in_direction not in {"positive", "negative"}:
+        return jsonify({"message": "in_direction must be 'positive' or 'negative'"}), 400
+    if shot_type not in {"drone", "ground"}:
+        return jsonify({"message": "shot_type must be 'drone' or 'ground'"}), 400
+    if processing_preset not in {"fast", "balanced", "accurate"}:
+        return jsonify({"message": "processing_preset must be 'fast', 'balanced', or 'accurate'"}), 400
+    if density_enabled:
+        try:
+            monitored_area_sqm = float(monitored_area_sqm)
+        except (TypeError, ValueError):
+            return jsonify({"message": "monitored_area_sqm must be a positive number when density is enabled"}), 400
+        if monitored_area_sqm <= 0:
+            return jsonify({"message": "monitored_area_sqm must be a positive number when density is enabled"}), 400
+    else:
+        monitored_area_sqm = None
 
     if name in camera_threads:
         return jsonify({"message": "Camera already exists"}), 400
@@ -78,10 +118,18 @@ def add_camera():
     worker = CameraWorker(
         name,
         stream_path,
+        count_axis,
+        in_direction,
+        shot_type,
+        processing_preset,
+        counting_enabled,
+        density_enabled,
+        monitored_area_sqm,
         camera_net_counts,
         camera_direction_totals,
         camera_count_updated_at,
         camera_frames,
+        camera_density_stats,
         camera_running_status,
         lock,
     )
@@ -92,16 +140,38 @@ def add_camera():
     camera_workers[name] = worker
     camera_threads[name] = thread
     camera_stream_paths[name] = stream_path
+    camera_count_axes[name] = count_axis
+    camera_in_directions[name] = in_direction
+    camera_shot_types[name] = shot_type
+    camera_processing_presets[name] = processing_preset
+    camera_counting_enabled[name] = counting_enabled
+    camera_density_enabled[name] = density_enabled
+    camera_monitored_areas[name] = monitored_area_sqm
     camera_running_status[name] = True  # Mark as running
     with lock:
         camera_net_counts[name] = 0
         camera_direction_totals[name] = {"in_count": 0, "out_count": 0}
         camera_count_updated_at[name] = int(time.time() * 1000)
+        camera_density_stats[name] = {
+            "density_enabled": density_enabled,
+            "weighted_people": 0.0,
+            "density_score": 0.0,
+            "smoothed_density_score": 0.0,
+            "monitored_area_sqm": monitored_area_sqm,
+            "updated_at": int(time.time() * 1000),
+        }
 
     return jsonify({
         "id": name,
         "name": name,
-        "stream_path": stream_path
+        "stream_path": stream_path,
+        "count_axis": count_axis,
+        "in_direction": in_direction,
+        "shot_type": shot_type,
+        "processing_preset": processing_preset,
+        "counting_enabled": counting_enabled,
+        "density_enabled": density_enabled,
+        "monitored_area_sqm": monitored_area_sqm,
     }), 201
 
 
@@ -115,11 +185,19 @@ def delete_camera(camera_id):
     del camera_threads[camera_id]
     camera_workers.pop(camera_id, None)
     camera_stream_paths.pop(camera_id, None)
+    camera_count_axes.pop(camera_id, None)
+    camera_in_directions.pop(camera_id, None)
+    camera_shot_types.pop(camera_id, None)
+    camera_processing_presets.pop(camera_id, None)
+    camera_counting_enabled.pop(camera_id, None)
+    camera_density_enabled.pop(camera_id, None)
+    camera_monitored_areas.pop(camera_id, None)
     with lock:
         camera_net_counts.pop(camera_id, None)
         camera_direction_totals.pop(camera_id, None)
         camera_count_updated_at.pop(camera_id, None)
         camera_frames.pop(camera_id, None)
+        camera_density_stats.pop(camera_id, None)
 
     return jsonify({"message": f"Camera {camera_id} deleted"})
 
@@ -131,12 +209,20 @@ def get_all_counts():
         counts = []
         for cam_id, count in camera_net_counts.items():
             totals = camera_direction_totals.get(cam_id, {"in_count": 0, "out_count": 0})
+            density = camera_density_stats.get(cam_id, {})
             counts.append({
                 "camera_id": cam_id,
                 "count": count,
                 "in_count": totals.get("in_count", 0),
                 "out_count": totals.get("out_count", 0),
-                "timestamp": camera_count_updated_at.get(cam_id, int(time.time() * 1000))
+                "timestamp": camera_count_updated_at.get(cam_id, int(time.time() * 1000)),
+                "counting_enabled": camera_counting_enabled.get(cam_id, True),
+                "density_enabled": density.get("density_enabled", camera_density_enabled.get(cam_id, False)),
+                "weighted_people": density.get("weighted_people", 0.0),
+                "density_score": density.get("density_score", 0.0),
+                "smoothed_density_score": density.get("smoothed_density_score", 0.0),
+                "monitored_area_sqm": density.get("monitored_area_sqm", camera_monitored_areas.get(cam_id)),
+                "density_updated_at": density.get("updated_at"),
             })
     return jsonify(counts)
 
@@ -195,13 +281,21 @@ def get_camera_count(camera_id):
         count = camera_net_counts.get(camera_id, 0)
         totals = camera_direction_totals.get(camera_id, {"in_count": 0, "out_count": 0})
         ts = camera_count_updated_at.get(camera_id, int(time.time() * 1000))
+        density = camera_density_stats.get(camera_id, {})
     
     return jsonify({
         "camera_id": camera_id,
         "count": count,
         "in_count": totals.get("in_count", 0),
         "out_count": totals.get("out_count", 0),
-        "timestamp": ts
+        "timestamp": ts,
+        "counting_enabled": camera_counting_enabled.get(camera_id, True),
+        "density_enabled": density.get("density_enabled", camera_density_enabled.get(camera_id, False)),
+        "weighted_people": density.get("weighted_people", 0.0),
+        "density_score": density.get("density_score", 0.0),
+        "smoothed_density_score": density.get("smoothed_density_score", 0.0),
+        "monitored_area_sqm": density.get("monitored_area_sqm", camera_monitored_areas.get(camera_id)),
+        "density_updated_at": density.get("updated_at"),
     })
 
 

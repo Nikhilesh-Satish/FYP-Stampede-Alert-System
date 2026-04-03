@@ -12,6 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import styles from "./TrendChart.module.css";
+import { getNiceAxisConfig } from "./chartScale";
 
 const GlobalTrendChart = ({ data = [], capacity }) => {
   const [showFullHistory, setShowFullHistory] = useState(false);
@@ -28,6 +29,7 @@ const GlobalTrendChart = ({ data = [], capacity }) => {
   }
 
   const displayData = showFullHistory ? data : data.slice(-10);
+  const axisConfig = getNiceAxisConfig(displayData.map((point) => point.count));
 
   return (
     <div className={styles.chartContainer}>
@@ -66,7 +68,8 @@ const GlobalTrendChart = ({ data = [], capacity }) => {
           <YAxis
             stroke="#94a3b8"
             style={{ fontSize: "12px" }}
-            domain={[0, capacity]}
+            domain={axisConfig.domain}
+            ticks={axisConfig.ticks}
           />
           <Tooltip
             contentStyle={{
