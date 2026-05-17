@@ -92,6 +92,16 @@ const DashboardPage = () => {
     window.setTimeout(forceRefresh, 10000);
     window.setTimeout(forceRefresh, 15000);
     window.setTimeout(forceRefresh, 25000);
+    // Auto-play: Start monitoring when worker is ready (after 30s)
+    window.setTimeout(() => {
+      setIsPaused(false);
+      console.log("Auto-playing cameras...");
+    }, 30000);
+    // Auto-reload: Refresh the page to show new streams in full (after 35s)
+    window.setTimeout(() => {
+      console.log("Auto-reloading page to display new camera stream...");
+      window.location.reload();
+    }, 35000);
   };
 
   const handleDelete = async (camera) => {
