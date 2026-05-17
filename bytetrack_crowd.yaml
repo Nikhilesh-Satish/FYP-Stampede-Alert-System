@@ -1,11 +1,12 @@
 tracker_type: bytetrack
 
-# Crowd-tuned settings:
-# - lower thresholds keep short/partially-occluded tracks alive
-# - longer buffer improves continuity through occlusion
-track_high_thresh: 0.15
-track_low_thresh: 0.03
-new_track_thresh: 0.15
-track_buffer: 160
-match_thresh: 0.85
+# Drone + dense crowd tuned settings:
+# - lower thresholds keep tiny detections alive
+# - larger buffer preserves IDs across missed frames
+# - higher match threshold improves continuity on moving cameras
+track_high_thresh: 0.25
+track_low_thresh: 0.05
+new_track_thresh: 0.20
+track_buffer: 90
+match_thresh: 0.92
 fuse_score: true
