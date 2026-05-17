@@ -105,14 +105,28 @@ class CameraWorker:
         self.track_last_cross_ts = {}
         self.next_track_id = 1
         self.TRACK_TTL_SEC = float(os.getenv("TRACK_TTL_SEC", "2.5"))
-        self.TRACK_MEMORY_TIMEOUT_SEC = float(os.getenv("TRACK_MEMORY_TIMEOUT_SEC", "6.0"))
-        self.LOST_TRACK_REID_TIMEOUT_SEC = float(os.getenv("LOST_TRACK_REID_TIMEOUT_SEC", "2.0"))
-        self.OVERLAY_TRACK_GRACE_SEC = float(os.getenv("OVERLAY_TRACK_GRACE_SEC", "0.6"))
+
+# Keep tracks alive longer before deleting them.
+        self.TRACK_MEMORY_TIMEOUT_SEC = float(os.getenv("TRACK_MEMORY_TIMEOUT_SEC", "12.0"))
+
+# Allow lost tracks to reconnect for longer.
+        self.LOST_TRACK_REID_TIMEOUT_SEC = float(os.getenv("LOST_TRACK_REID_TIMEOUT_SEC", "5.0"))
+
+# Prevent overlay flickering.
+        self.OVERLAY_TRACK_GRACE_SEC = float(os.getenv("OVERLAY_TRACK_GRACE_SEC", "2.5"))
+
         self.CROSSING_COOLDOWN_SEC = float(os.getenv("CROSSING_COOLDOWN_SEC", "1.0"))
+
         self.MIN_TRACK_AGE_FRAMES = int(os.getenv("MIN_TRACK_AGE_FRAMES", "2"))
+
         self.MIN_BOX_AREA = int(os.getenv("MIN_PERSON_BOX_AREA", "48"))
-        self.TRACK_MATCH_IOU = float(os.getenv("TRACK_MATCH_IOU", "0.15"))
-        self.TRACK_MATCH_CENTER = float(os.getenv("TRACK_MATCH_CENTER", "110"))
+
+# Relax matching thresholds for aerial footage.
+# Small IoU changes happen constantly due to camera motion.
+        self.TRACK_MATCH_IOU = float(os.getenv("TRACK_MATCH_IOU", "0.05"))
+
+# Increase center distance tolerance significantly.
+        self.TRACK_MATCH_CENTER = float(os.getenv("TRACK_MATCH_CENTER", "260"))
 
         self.det_conf = float(os.getenv("DETECTION_CONF", "0.06"))
         self.drone_det_conf = float(os.getenv("DRONE_DETECTION_CONF", "0.04"))
@@ -183,6 +197,25 @@ class CameraWorker:
             self.ground_split_overlap = min(self.ground_split_overlap, 0.12)
             self.drone_tile_size = max(self.drone_tile_size, 576)
             self.drone_tile_overlap = min(self.drone_tile_overlap, 0.25)
+        # Drone cameras require continuous inference.
+# Frame skipping destroys tracker continuity in aerial footage.
+        if self.shot_type == "drone":
+            self.inference_every_n_frames = 1
+        
+            # Unlimited inference FPS for drone mode.
+            self.max_inference_fps = 0.0
+        
+            # More overlap improves small-person recall.
+            self.drone_tile_overlap = max(
+                self.drone_tile_overlap,
+                0.40,
+            )
+        
+            # Smaller tiles improve distant detection quality.
+            self.drone_tile_size = min(
+                self.drone_tile_size,
+                448,
+            )
             return
 
         if self.processing_preset == "accurate":
@@ -702,11 +735,43 @@ class CameraWorker:
 
     def _track_detections(self, detections, frame):
         if not detections:
+    # Detector temporarily failed.
+    # Keep recent tracks alive briefly to avoid:
+    # - flickering boxes
+    # - ID resets
+    # - broken counting continuity
+
+            tracked_detections = []
+        
+            current_time = time.time()
+        
+            for track_id, state in self.track_state.items():
+        
+                age = current_time - state["last_seen"]
+        
+                # Persist recently visible tracks.
+                if age <= self.OVERLAY_TRACK_GRACE_SEC:
+        
+                    tracked_detections.append(
+                        {
+                            "box": state["box"],
+                            "score": 0.25,
+                            "track_id": track_id,
+                            "cls": 0,
+                        }
+                    )
+        
+            # Still update ByteTrack internal state.
             self._get_tracker().update(
-                TrackerResults(np.empty((0, 4)), np.empty((0,)), np.empty((0,))),
+                TrackerResults(
+                    np.empty((0, 4)),
+                    np.empty((0,)),
+                    np.empty((0,))
+                ),
                 img=frame,
             )
-            return []
+        
+            return tracked_detections    
 
         xyxy = np.asarray([det["box"] for det in detections], dtype=np.float32)
         conf = np.asarray([det["score"] for det in detections], dtype=np.float32)
@@ -818,6 +883,13 @@ class CameraWorker:
             if not overlay_jpg:
                 return
 
+        # Detector may occasionally miss frames.
+# Reuse the previous overlay instead of flashing empty frames.
+        if is_running and not overlay_jpg:
+            with self.state_lock:
+                overlay_jpg = self.cached_overlay_jpg
+        
+        # If we still have nothing, skip publish.
         if is_running and not overlay_jpg:
             return
 
@@ -886,9 +958,13 @@ class CameraWorker:
                 with self.state_lock:
                     self.cached_boxes = boxes
                     self.cached_ids = ids
-                    self.cached_display_boxes = boxes
-                    self.cached_display_ids = ids
-                    self.cached_overlay_jpg = overlay_jpg
+                    if boxes:
+                        self.cached_display_boxes=boxes
+                        self.cached_display_ids=ids
+
+                    if overlay_jpg:
+                        self.cached_overlay_jpg=overlay_jpg
+                        
                 self._publish_frame(frame, True, overlay_override=overlay_jpg)
                 self.last_inference_time = now
             else:
