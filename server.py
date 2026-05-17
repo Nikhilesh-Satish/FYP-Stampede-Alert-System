@@ -3,7 +3,9 @@ from flask_cors import CORS
 from threading import Thread, Lock
 import time
 
-from camera_worker import CameraWorker
+# Use HF API client instead of local model
+from camera_worker_hf import CameraWorkerHF
+from hf_api_client import hf_client
 
 # ✅ NEW: Auth imports
 from auth.models import db
@@ -114,8 +116,8 @@ def add_camera():
     if name in camera_threads:
         return jsonify({"message": "Camera already exists"}), 400
 
-    # Start camera worker thread
-    worker = CameraWorker(
+    # Start camera worker thread (uses HF API in round-robin fashion)
+    worker = CameraWorkerHF(
         name,
         stream_path,
         count_axis,
@@ -181,8 +183,24 @@ def delete_camera(camera_id):
     if camera_id not in camera_threads:
         return jsonify({"message": "Camera not found"}), 404
 
-    # Remove from tracking
-    del camera_threads[camera_id]
+    # Signal worker to stop
+    camera_running_status[camera_id] = False
+
+    # Try to gracefully stop the worker thread
+    thread = camera_threads.get(camera_id)
+    worker = camera_workers.get(camera_id)
+    if worker:
+        try:
+            worker.reset_local_count()
+        except Exception:
+            pass
+
+    if thread and thread.is_alive():
+        # Wait briefly for thread to exit
+        thread.join(timeout=5)
+
+    # Now remove from tracking
+    camera_threads.pop(camera_id, None)
     camera_workers.pop(camera_id, None)
     camera_stream_paths.pop(camera_id, None)
     camera_count_axes.pop(camera_id, None)
@@ -192,6 +210,7 @@ def delete_camera(camera_id):
     camera_counting_enabled.pop(camera_id, None)
     camera_density_enabled.pop(camera_id, None)
     camera_monitored_areas.pop(camera_id, None)
+    camera_running_status.pop(camera_id, None)
     with lock:
         camera_net_counts.pop(camera_id, None)
         camera_direction_totals.pop(camera_id, None)
@@ -297,6 +316,14 @@ def get_camera_count(camera_id):
         "monitored_area_sqm": density.get("monitored_area_sqm", camera_monitored_areas.get(camera_id)),
         "density_updated_at": density.get("updated_at"),
     })
+
+
+
+@app.route("/debug/hf/<camera_id>", methods=["GET"])
+def debug_hf_assignment(camera_id):
+    """Return the HF API assigned to a camera (for debugging)"""
+    api = hf_client.get_camera_api(camera_id)
+    return jsonify({"camera_id": camera_id, "hf_api": api})
 
 
 @app.route("/cameras/reset/<camera_id>", methods=["POST"])
