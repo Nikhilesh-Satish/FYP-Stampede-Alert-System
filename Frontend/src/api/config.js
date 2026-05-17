@@ -1,7 +1,19 @@
-// ─── API Base URL ────────────────────────────────────────────────────────────
-// Set VITE_API_URL in your .env file. Defaults to localhost:8000
-export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000";
+// ─── API Base URLs ───────────────────────────────────────────────────────────
+// Set VITE_API_URL for auth/default API.
+// Set VITE_CAMERA_API_URLS to a comma-separated list for multi-Space camera workers.
+const normalizeBaseUrl = (url) => String(url || "").trim().replace(/\/+$/, "");
+
+export const API_BASE_URL = normalizeBaseUrl(
+  import.meta.env.VITE_API_URL || "http://localhost:8000",
+);
+
+const rawCameraUrls =
+  import.meta.env.VITE_CAMERA_API_URLS || import.meta.env.VITE_API_URL || API_BASE_URL;
+
+export const CAMERA_API_URLS = rawCameraUrls
+  .split(",")
+  .map(normalizeBaseUrl)
+  .filter(Boolean);
 
 // ─── Endpoint Paths ──────────────────────────────────────────────────────────
 export const ENDPOINTS = {

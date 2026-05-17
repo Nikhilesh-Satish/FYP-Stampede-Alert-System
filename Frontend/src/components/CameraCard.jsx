@@ -17,6 +17,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [streamError, setStreamError] = useState(false);
   const [zoomStreamError, setZoomStreamError] = useState(false);
+  const [streamRetryToken, setStreamRetryToken] = useState(Date.now());
   const count = countData?.count ?? null;
   const inCount = countData?.inCount ?? 0;
   const outCount = countData?.outCount ?? 0;
@@ -28,9 +29,10 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
   const densityAlertLevel = countData?.densityAlertLevel;
   const monitoredAreaSqm = countData?.monitoredAreaSqm ?? camera?.monitored_area_sqm ?? null;
   const timestamp = countData?.timestamp;
-  const streamUrl = cameraApi.getCameraStreamUrl(camera?.id, {
+  const streamUrl = cameraApi.getCameraStreamUrl(camera, {
     overlay: showOverlay,
   });
+  const streamSrc = `${streamUrl}&retry=${streamRetryToken}`;
   const directionHint = (() => {
     const axis = camera?.count_axis || "x";
     const inDirection = camera?.in_direction || "positive";
@@ -74,7 +76,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
 
     setResetLoading(true);
     try {
-      await cameraApi.resetCameraCount(camera.id);
+      await cameraApi.resetCameraCount(camera);
       alert("Count reset successfully!");
     } catch (err) {
       alert("Failed to reset count: " + err.message);
@@ -89,10 +91,10 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
     setStartStopLoading(true);
     try {
       if (isIndividuallyPaused) {
-        await cameraApi.startCamera(camera.id);
+        await cameraApi.startCamera(camera);
         setIsIndividuallyPaused(false);
       } else {
-        await cameraApi.stopCamera(camera.id);
+        await cameraApi.stopCamera(camera);
         setIsIndividuallyPaused(true);
       }
     } catch (err) {
@@ -103,6 +105,22 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
       setStartStopLoading(false);
     }
   };
+
+  useEffect(() => {
+    setStreamError(false);
+    setZoomStreamError(false);
+    setStreamRetryToken(Date.now());
+  }, [streamUrl]);
+
+  useEffect(() => {
+    if (!streamError) return undefined;
+
+    const retryTimer = window.setInterval(() => {
+      setStreamRetryToken(Date.now());
+    }, 3000);
+
+    return () => window.clearInterval(retryTimer);
+  }, [streamError]);
 
   useEffect(() => {
     if (!isZoomOpen) return undefined;
@@ -188,7 +206,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
               )}
             </button>
 
-            <button className={styles.delBtn} onClick={() => onDelete(camera?.id)} title="Remove">
+            <button className={styles.delBtn} onClick={() => onDelete(camera)} title="Remove">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6l-1 14H6L5 6" />
@@ -222,7 +240,7 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
             }}
           >
             <img
-              src={streamUrl}
+              src={streamSrc}
               alt={`${camera?.name || "Camera"} live stream`}
               onError={() => setStreamError(true)}
               onLoad={() => setStreamError(false)}
@@ -400,9 +418,10 @@ const CameraCard = ({ camera, countData, onDelete, isPaused = false }) => {
                   <div className={styles.modalError}>Unable to load the magnified stream.</div>
                 ) : (
                   <img
-                    src={streamUrl}
+                    src={streamSrc}
                     alt={`${camera?.name || "Camera"} magnified stream`}
                     onError={() => setZoomStreamError(true)}
+                    onLoad={() => setZoomStreamError(false)}
                   />
                 )}
               </div>

@@ -1,4 +1,4 @@
-import { API_BASE_URL, ENDPOINTS } from "./config";
+import { API_BASE_URL, CAMERA_API_URLS, ENDPOINTS } from "./config";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const getAuthHeaders = () => {
@@ -20,6 +20,72 @@ const handleResponse = async (res) => {
   }
   return res.json();
 };
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 120000) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+const getGoogleDriveFileId = (url) => {
+  const value = String(url || "").trim();
+  const patterns = [
+    /drive\.google\.com\/file\/d\/([^/]+)/,
+    /drive\.google\.com\/open\?id=([^&]+)/,
+    /drive\.google\.com\/uc\?(?:.*&)?id=([^&]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+
+  return "";
+};
+
+const normalizeStreamPath = (streamPath) => {
+  const trimmed = String(streamPath || "").trim();
+  const driveFileId = getGoogleDriveFileId(trimmed);
+  if (!driveFileId) return trimmed;
+  return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(driveFileId)}`;
+};
+
+const withBackend = (item, backendUrl) => ({
+  ...item,
+  backendUrl,
+  backend_url: backendUrl,
+  camera_key: `${backendUrl}::${item.camera_id || item.id || item.name}`,
+});
+
+const getBackendUrl = (cameraOrUrl) => {
+  if (typeof cameraOrUrl === "string" && cameraOrUrl.startsWith("http")) {
+    return cameraOrUrl.replace(/\/+$/, "");
+  }
+  return (
+    cameraOrUrl?.backendUrl ||
+    cameraOrUrl?.backend_url ||
+    CAMERA_API_URLS[0] ||
+    API_BASE_URL
+  );
+};
+
+const getCameraId = (cameraOrId) =>
+  typeof cameraOrId === "object" ? cameraOrId.id || cameraOrId.camera_id : cameraOrId;
+
+const uniqueUrls = (urls) => [...new Set(urls.filter(Boolean).map(getBackendUrl))];
+
+export const getCameraKey = (cameraOrCount) =>
+  cameraOrCount?.camera_key ||
+  `${getBackendUrl(cameraOrCount)}::${cameraOrCount?.camera_id || cameraOrCount?.id}`;
+
+export { CAMERA_API_URLS };
 
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 export const authApi = {
@@ -73,10 +139,32 @@ export const cameraApi = {
    * Returns: [{ id, name, stream_path }]
    */
   getCameras: async () => {
-    const res = await fetch(`${API_BASE_URL}${ENDPOINTS.CAMERAS}`, {
-      headers: getAuthHeaders(),
+    const results = await Promise.allSettled(
+      CAMERA_API_URLS.map(async (backendUrl) => {
+        const res = await fetch(`${backendUrl}${ENDPOINTS.CAMERAS}`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await handleResponse(res);
+        const cameras = Array.isArray(data) ? data : data.cameras || [];
+        return cameras.map((camera) => withBackend(camera, backendUrl));
+      }),
+    );
+
+    const cameras = [];
+    const failures = [];
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        cameras.push(...result.value);
+      } else {
+        failures.push(`${CAMERA_API_URLS[index]}: ${result.reason.message}`);
+      }
     });
-    return handleResponse(res);
+
+    if (cameras.length === 0 && failures.length > 0) {
+      throw new Error(failures.join("; "));
+    }
+
+    return cameras;
   },
 
   /**
@@ -94,13 +182,19 @@ export const cameraApi = {
     countingEnabled,
     densityEnabled,
     monitoredAreaSqm,
+    backendUrl,
+    backendUrls,
   }) => {
-    const res = await fetch(`${API_BASE_URL}${ENDPOINTS.ADD_CAMERA}`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
+    const targetBackends = uniqueUrls([
+      backendUrl,
+      ...(Array.isArray(backendUrls) ? backendUrls : []),
+    ]);
+    if (targetBackends.length === 0) {
+      throw new Error("No processing backend is available.");
+    }
+    const body = JSON.stringify({
         name,
-        stream_path: streamPath,
+        stream_path: normalizeStreamPath(streamPath),
         count_axis: countAxis || "x",
         in_direction: inDirection || "positive",
         shot_type: shotType || "ground",
@@ -108,9 +202,28 @@ export const cameraApi = {
         counting_enabled: countingEnabled ?? true,
         density_enabled: densityEnabled ?? false,
         monitored_area_sqm: densityEnabled ? monitoredAreaSqm : null,
-      }),
     });
-    return handleResponse(res);
+    const failures = [];
+
+    for (const targetBackend of targetBackends) {
+      try {
+        const res = await fetchWithTimeout(`${targetBackend}${ENDPOINTS.ADD_CAMERA}`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body,
+        }, 45000);
+        const data = await handleResponse(res);
+        return withBackend(data, targetBackend);
+      } catch (err) {
+        const message =
+          err.name === "AbortError"
+            ? "timed out while starting backend"
+            : err.message;
+        failures.push(`${targetBackend}: ${message}`);
+      }
+    }
+
+    throw new Error(failures.join("; ") || "Failed to add camera.");
   },
 
   /**
@@ -118,11 +231,38 @@ export const cameraApi = {
    * Returns: [{ camera_id, count, timestamp }]
    * Your backend updates these every 10 minutes
    */
-  getAllCameraCounts: async () => {
-    const res = await fetch(`${API_BASE_URL}${ENDPOINTS.CAMERA_COUNTS}`, {
-      headers: getAuthHeaders(),
+  getAllCameraCounts: async (cameras = []) => {
+    const backendUrls = cameras.length
+      ? [...new Set(cameras.map(getBackendUrl))]
+      : CAMERA_API_URLS;
+
+    const results = await Promise.allSettled(
+      backendUrls.map(async (backendUrl) => {
+        const res = await fetch(`${backendUrl}${ENDPOINTS.CAMERA_COUNTS}`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await handleResponse(res);
+        return (Array.isArray(data) ? data : []).map((count) =>
+          withBackend(count, backendUrl),
+        );
+      }),
+    );
+
+    const counts = [];
+    const failures = [];
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        counts.push(...result.value);
+      } else {
+        failures.push(`${backendUrls[index]}: ${result.reason.message}`);
+      }
     });
-    return handleResponse(res);
+
+    if (counts.length === 0 && failures.length > 0) {
+      throw new Error(failures.join("; "));
+    }
+
+    return counts;
   },
 
   /**
@@ -130,13 +270,16 @@ export const cameraApi = {
    * Returns: { camera_id, count, timestamp }
    */
   getCameraCount: async (cameraId) => {
+    const targetBackend = getBackendUrl(cameraId);
+    const id = encodeURIComponent(getCameraId(cameraId));
     const res = await fetch(
-      `${API_BASE_URL}${ENDPOINTS.CAMERA_COUNTS}/${cameraId}`,
+      `${targetBackend}${ENDPOINTS.CAMERA_COUNTS}/${id}`,
       {
         headers: getAuthHeaders(),
       },
     );
-    return handleResponse(res);
+    const data = await handleResponse(res);
+    return withBackend(data, targetBackend);
   },
 
   /**
@@ -144,15 +287,18 @@ export const cameraApi = {
    * GET /cameras/stream/:cameraId?overlay=true|false
    */
   getCameraStreamUrl: (cameraId, { overlay = true } = {}) => {
-    const encodedId = encodeURIComponent(cameraId);
-    return `${API_BASE_URL}${ENDPOINTS.CAMERA_STREAM}/${encodedId}?overlay=${overlay ? "true" : "false"}`;
+    const targetBackend = getBackendUrl(cameraId);
+    const encodedId = encodeURIComponent(getCameraId(cameraId));
+    return `${targetBackend}${ENDPOINTS.CAMERA_STREAM}/${encodedId}?overlay=${overlay ? "true" : "false"}`;
   },
 
   /**
    * DELETE /cameras/:id
    */
   deleteCamera: async (cameraId) => {
-    const res = await fetch(`${API_BASE_URL}${ENDPOINTS.CAMERAS}/${cameraId}`, {
+    const targetBackend = getBackendUrl(cameraId);
+    const id = encodeURIComponent(getCameraId(cameraId));
+    const res = await fetch(`${targetBackend}${ENDPOINTS.CAMERAS}/${id}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     });
@@ -164,8 +310,10 @@ export const cameraApi = {
    * Resets the count for a specific camera to 0
    */
   resetCameraCount: async (cameraId) => {
+    const targetBackend = getBackendUrl(cameraId);
+    const id = encodeURIComponent(getCameraId(cameraId));
     const res = await fetch(
-      `${API_BASE_URL}${ENDPOINTS.RESET_COUNT}/${cameraId}`,
+      `${targetBackend}${ENDPOINTS.RESET_COUNT}/${id}`,
       {
         method: "POST",
         headers: getAuthHeaders(),
@@ -179,11 +327,19 @@ export const cameraApi = {
    * Resets the count for all cameras to 0
    */
   resetAllCameraCounts: async () => {
-    const res = await fetch(`${API_BASE_URL}${ENDPOINTS.RESET_ALL_COUNTS}`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-    });
-    return handleResponse(res);
+    const results = await Promise.allSettled(
+      CAMERA_API_URLS.map(async (backendUrl) => {
+        const res = await fetch(`${backendUrl}${ENDPOINTS.RESET_ALL_COUNTS}`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        return handleResponse(res);
+      }),
+    );
+
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+    return { message: "All camera backends reset" };
   },
 
   /**
@@ -191,8 +347,10 @@ export const cameraApi = {
    * Starts monitoring for a specific camera
    */
   startCamera: async (cameraId) => {
+    const targetBackend = getBackendUrl(cameraId);
+    const id = encodeURIComponent(getCameraId(cameraId));
     const res = await fetch(
-      `${API_BASE_URL}${ENDPOINTS.CAMERA_START}/${cameraId}`,
+      `${targetBackend}${ENDPOINTS.CAMERA_START}/${id}`,
       {
         method: "POST",
         headers: getAuthHeaders(),
@@ -206,8 +364,10 @@ export const cameraApi = {
    * Stops monitoring for a specific camera
    */
   stopCamera: async (cameraId) => {
+    const targetBackend = getBackendUrl(cameraId);
+    const id = encodeURIComponent(getCameraId(cameraId));
     const res = await fetch(
-      `${API_BASE_URL}${ENDPOINTS.CAMERA_STOP}/${cameraId}`,
+      `${targetBackend}${ENDPOINTS.CAMERA_STOP}/${id}`,
       {
         method: "POST",
         headers: getAuthHeaders(),

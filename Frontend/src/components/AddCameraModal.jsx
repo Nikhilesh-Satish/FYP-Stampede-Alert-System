@@ -2,12 +2,12 @@ import { useState } from "react";
 import { cameraApi } from "../api/services";
 import styles from "./AddCameraModal.module.css";
 
-const AddCameraModal = ({ onClose, onSuccess }) => {
+const AddCameraModal = ({ backendUrls = [], onClose, onSuccess }) => {
   const [form, setForm] = useState({
     name: "",
     streamPath: "",
-    shotType: "ground",
-    countAxis: "x",
+    shotType: "drone",
+    countAxis: "y",
     inDirection: "positive",
     processingPreset: "balanced",
     countingEnabled: true,
@@ -15,11 +15,22 @@ const AddCameraModal = ({ onClose, onSuccess }) => {
     monitoredAreaSqm: "",
   });
   const [loading, setLoading] = useState(false);
+  const [loadingHint, setLoadingHint] = useState("");
   const [error, setError] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setError("");
+  };
+
+  const handleShotTypeChange = (e) => {
+    const shotType = e.target.value;
+    setForm((prev) => ({
+      ...prev,
+      shotType,
+      countAxis: shotType === "drone" ? "y" : prev.countAxis,
+    }));
     setError("");
   };
 
@@ -48,10 +59,22 @@ const AddCameraModal = ({ onClose, onSuccess }) => {
       }
     }
     setLoading(true);
+    setLoadingHint("");
+    let hintTimer;
     try {
+      if (backendUrls.length === 0) {
+        throw new Error("No processing backend is available. Remove a camera or add another backend URL.");
+      }
+
       console.log("Adding camera:", form);
-      const result = await cameraApi.addCamera(form);
+      hintTimer = window.setTimeout(() => {
+        setLoadingHint("Starting a free backend can take up to two minutes.");
+      }, 8000);
+      const result = await cameraApi.addCamera({ ...form, backendUrls });
       console.log("Add camera response:", result);
+      setLoadingHint("✅ Camera added! Initializing worker... Please wait.");
+      // Keep modal open briefly to show success
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
       onClose();
       setTimeout(() => {
         onSuccess(result);
@@ -60,7 +83,11 @@ const AddCameraModal = ({ onClose, onSuccess }) => {
       console.error("Add camera error:", err);
       setError(err.message || "Failed to add camera.");
     } finally {
+      if (hintTimer) {
+        window.clearTimeout(hintTimer);
+      }
       setLoading(false);
+      setLoadingHint("");
     }
   };
 
@@ -125,10 +152,10 @@ const AddCameraModal = ({ onClose, onSuccess }) => {
               className={styles.input}
               name="shotType"
               value={form.shotType}
-              onChange={handleChange}
+              onChange={handleShotTypeChange}
             >
-              <option value="ground">Ground / normal camera</option>
               <option value="drone">Drone / overhead camera</option>
+              <option value="ground">Ground / normal camera</option>
             </select>
             <p className={styles.hint}>
               Drone mode uses overhead-style detection/counting. Ground mode uses normal perspective tracking.
@@ -250,6 +277,7 @@ const AddCameraModal = ({ onClose, onSuccess }) => {
             </p>
           </div>
 
+          {loadingHint && <p className={styles.hint}>{loadingHint}</p>}
           {error && <p className={styles.error}>{error}</p>}
 
           <div className={styles.actions}>

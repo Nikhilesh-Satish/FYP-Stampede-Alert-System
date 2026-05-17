@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { cameraApi } from "../api/services";
+import { cameraApi, getCameraKey } from "../api/services";
 import { useCameraMonitor } from "../utils/useCameraMonitor";
 import { DEFAULT_AREA_CAPACITY } from "../api/config";
+import {
+  buildCameraBackendQueue,
+  getCameraBackendUrl,
+  releaseCameraBackend,
+  reserveCameraBackend,
+} from "../api/backendQueue";
 import Navbar from "../components/Navbar";
 import CameraCard from "../components/CameraCard";
 import AddCameraModal from "../components/AddCameraModal";
@@ -44,6 +50,9 @@ const DashboardPage = () => {
   const [capacity, setCapacity] = useState(DEFAULT_AREA_CAPACITY);
   const [resetLoading, setResetLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(true);
+  const [cameraBackendQueue, setCameraBackendQueue] = useState(() =>
+    buildCameraBackendQueue([]),
+  );
 
   const {
     counts,
@@ -61,25 +70,42 @@ const DashboardPage = () => {
     cameraApi
       .getCameras()
       .then((data) => {
-        setCameras(Array.isArray(data) ? data : data.cameras || []);
+        const loadedCameras = Array.isArray(data) ? data : data.cameras || [];
+        setCameras(loadedCameras);
+        setCameraBackendQueue(buildCameraBackendQueue(loadedCameras));
       })
       .catch((err) => {
         console.error("Failed to load cameras:", err);
         setFetchError("Could not load cameras. Is your backend running?");
+        setCameraBackendQueue(buildCameraBackendQueue([]));
       })
       .finally(() => setLoadingCams(false));
   }, []);
 
   const handleCameraAdded = (cam) => {
+    console.log("Camera added, waiting for worker to initialize...");
     setCameras((prev) => [...prev, cam]);
-    setTimeout(forceRefresh, 500);
+    setCameraBackendQueue((prev) => reserveCameraBackend(prev, getCameraBackendUrl(cam)));
+    // Wait before first poll: worker thread needs time to start processing stream
+    window.setTimeout(forceRefresh, 5000);
+    // Keep polling aggressively for first 30 seconds
+    window.setTimeout(forceRefresh, 10000);
+    window.setTimeout(forceRefresh, 15000);
+    window.setTimeout(forceRefresh, 25000);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (camera) => {
     if (!window.confirm("Remove this camera from monitoring?")) return;
     try {
-      await cameraApi.deleteCamera(id);
-      setCameras((prev) => prev.filter((c) => c.id !== id));
+      await cameraApi.deleteCamera(camera);
+      const removedKey = getCameraKey(camera);
+      setCameras((prev) => {
+        const remainingCameras = prev.filter((c) => getCameraKey(c) !== removedKey);
+        setCameraBackendQueue((queue) =>
+          releaseCameraBackend(queue, getCameraBackendUrl(camera), remainingCameras),
+        );
+        return remainingCameras;
+      });
     } catch (err) {
       alert("Delete failed: " + err.message);
     }
@@ -350,10 +376,10 @@ const DashboardPage = () => {
         ) : (
           <div className={styles.grid}>
             {cameras.map((cam) => (
-              <Reveal key={cam.id} delay={0}>
+              <Reveal key={getCameraKey(cam)} delay={0}>
                 <CameraCard
                   camera={cam}
-                  countData={counts[cam.id]}
+                  countData={counts[getCameraKey(cam)]}
                   onDelete={handleDelete}
                   isPaused={isPaused}
                 />
@@ -378,14 +404,14 @@ const DashboardPage = () => {
               <div className={styles.chartGrid}>
                 {cameras.map(
                   (cam) =>
-                    cameraHistory[cam.id] &&
-                    cameraHistory[cam.id].length > 0 && (
-                      <Reveal key={`trend-wrap-${cam.id}`} delay={100}>
+                    cameraHistory[getCameraKey(cam)] &&
+                    cameraHistory[getCameraKey(cam)].length > 0 && (
+                      <Reveal key={`trend-wrap-${getCameraKey(cam)}`} delay={100}>
                         <CameraTrendChart
-                          key={`trend-${cam.id}`}
-                          cameraId={cam.id}
+                          key={`trend-${getCameraKey(cam)}`}
+                          cameraId={getCameraKey(cam)}
                           cameraName={cam.name}
-                          data={cameraHistory[cam.id]}
+                          data={cameraHistory[getCameraKey(cam)]}
                           capacity={capacity}
                         />
                       </Reveal>
@@ -399,6 +425,7 @@ const DashboardPage = () => {
 
       {showAddModal && (
         <AddCameraModal
+          backendUrls={cameraBackendQueue}
           onClose={() => setShowAddModal(false)}
           onSuccess={handleCameraAdded}
         />

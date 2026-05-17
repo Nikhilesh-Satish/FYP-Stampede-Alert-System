@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { cameraApi } from "../api/services";
+import { cameraApi, getCameraKey } from "../api/services";
 import {
   getAlertLevel,
   getDensityAlertLevel,
@@ -62,21 +62,27 @@ export const useCameraMonitor = (
 
       // Try bulk endpoint first, fall back to individual calls
       try {
-        countData = await cameraApi.getAllCameraCounts();
+        countData = await cameraApi.getAllCameraCounts(cameras);
         console.log("✅ Fetched all camera counts:", countData);
       } catch (err) {
         console.log("Bulk fetch failed, trying individual:", err);
         const results = await Promise.all(
           cameras.map((cam) =>
             cameraApi
-              .getCameraCount(cam.id)
+              .getCameraCount(cam)
               .then((data) => {
                 console.log(`✅ Got count for ${cam.id}:`, data);
                 return data;
               })
               .catch((e) => {
                 console.log(`❌ Failed to get count for ${cam.id}:`, e);
-                return { camera_id: cam.id, count: null, timestamp: null };
+                return {
+                  camera_id: cam.id,
+                  count: null,
+                  timestamp: null,
+                  backendUrl: cam.backendUrl || cam.backend_url,
+                  backend_url: cam.backend_url || cam.backendUrl,
+                };
               }),
           ),
         );
@@ -93,7 +99,8 @@ export const useCameraMonitor = (
       let highestDensityCameraId = null;
 
       // Collect individual counts
-      countData.forEach(({
+      countData.forEach((entry) => {
+        const {
         camera_id,
         count,
         in_count,
@@ -106,9 +113,10 @@ export const useCameraMonitor = (
         smoothed_density_score,
         monitored_area_sqm,
         density_updated_at,
-      }) => {
+        } = entry;
         if (count === null || count === undefined) return;
 
+        const cameraKey = getCameraKey(entry);
         const safeCount = Number.isFinite(Number(count)) ? Number(count) : 0;
         const pointTimestamp =
           typeof timestamp === "number" || typeof timestamp === "string"
@@ -122,7 +130,7 @@ export const useCameraMonitor = (
           ? getDensityAlertLevel(smoothedDensity)
           : null;
 
-        newCounts[camera_id] = {
+        newCounts[cameraKey] = {
           count: safeCount,
           inCount: in_count ?? 0,
           outCount: out_count ?? 0,
@@ -141,7 +149,7 @@ export const useCameraMonitor = (
 
         // Add data point to camera history (only if not paused)
         if (!isPaused) {
-          addCameraDataPoint(camera_id, safeCount, pointTimestamp);
+          addCameraDataPoint(cameraKey, safeCount, pointTimestamp);
         }
 
         if (densityEnabled && densityAlertLevel && densityAlertLevel.level !== "SAFE") {
